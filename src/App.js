@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium } from './sea/Etherium.js';
+import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { Input } from './core/Input.js';
 
@@ -40,6 +41,7 @@ export class App {
 
 		this.sea = new Etherium( this.scene );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor } );
+		this.tweaks = new TweakPanel( this );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
 

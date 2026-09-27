@@ -17,7 +17,7 @@ const CENTER = 0.06;
 const SNAP = HALF * CENTER * 2 / SEGMENTS;
 
 // Linear-space colours (they brighten and desaturate after sRGB output, so keep them saturated).
-const PALETTE = {
+export const PALETTE = {
 	troughA: new THREE.Color( 0.00, 0.14, 0.20 ), // teal
 	troughB: new THREE.Color( 0.08, 0.015, 0.24 ), // violet
 	crestA: new THREE.Color( 1.00, 0.32, 0.03 ), // gold
@@ -30,8 +30,7 @@ const PALETTE = {
 	fogBelow: new THREE.Color( 0.04, 0.008, 0.10 )
 };
 
-const FOG_ABOVE = 0.0011;
-const FOG_BELOW = 0.03;
+export const FOG = { above: 0.0011, below: 0.03 };
 
 // Precomputed per-wave constants from the WAVES table (shared by JS and TSL).
 function waveConstants() {
@@ -97,7 +96,7 @@ export class Etherium {
 		this.uOffset = uniform( new THREE.Vector2() );
 		this.uSunDir = uniform( new THREE.Vector3( - 0.6, 0.25, - 0.75 ).normalize() );
 		this.uFogColor = uniform( PALETTE.fogAbove.clone() );
-		this.uFogDensity = uniform( FOG_ABOVE );
+		this.uFogDensity = uniform( FOG.above );
 		this.uWaves = WAVES.map( () => ( { a: uniform( new THREE.Vector4() ), b: uniform( new THREE.Vector4() ) } ) );
 		this.refresh();
 
@@ -164,7 +163,10 @@ export class Etherium {
 
 		} )();
 
-		const c = ( k ) => vec3( PALETTE[ k ].r, PALETTE[ k ].g, PALETTE[ k ].b );
+		// palette uniforms share the PALETTE Color objects, so editing a colour updates the shader live
+		const uColors = {};
+		const c = ( k ) => uColors[ k ] || ( uColors[ k ] = uniform( PALETTE[ k ] ) );
+
 
 		mat.colorNode = Fn( () => {
 
@@ -271,7 +273,7 @@ export class Etherium {
 
 		this.underwater = camera.position.y < this.heightAt( camera.position.x, camera.position.z );
 		this.uFogColor.value.copy( this.underwater ? PALETTE.fogBelow : PALETTE.fogAbove );
-		this.uFogDensity.value = this.underwater ? FOG_BELOW : FOG_ABOVE;
+		this.uFogDensity.value = this.underwater ? FOG.below : FOG.above;
 
 	}
 

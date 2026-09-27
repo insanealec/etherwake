@@ -11,14 +11,16 @@
   distance. Unlit emissive shading: teal/violet troughs, gold/rose crests, cloud noise, Jacobian foam,
   near-camera sparkles, sun glint, fresnel rim, underside glow. Scene density fog swaps to thick violet
   under the surface; the starfield got a horizon band and a fog-coloured fill below the horizon. 60 fps.
-  Placeholder torus-knot and asteroids removed. **Palette gotcha:** colours are linear, so keep them very
+  Placeholder torus-knot and asteroids removed. Then the lil-gui tweak panel `src/ui/TweakPanel.js`
+  (`H` toggles; swell, per-wave, colour (sRGB pickers into the linear PALETTE) and fog controls). **Palette gotcha:** colours are linear, so keep them very
   saturated (sRGB output turns (1, .45, .3) into pale peach).
 
 ## Next up
-Continue **milestone 1**: the lil-gui tweak panel (`H` toggles) for SEA/WAVES (call `sea.refresh()` after
-edits) and the palette; then polish: the faint horizon seam line seen from underwater, grid swimming at
-distance when the grid snaps (the nonlinear grid only aligns near the centre), and the dusk look (troughs
-read a bit milky from low angles). Then call milestone 1 done and start milestone 2.
+Continue **milestone 1** polish: the faint horizon seam line seen from underwater, grid swimming at distance
+when the grid snaps (the nonlinear grid only aligns near the centre), and the dusk look (troughs read a bit
+milky from low angles). Use the tweak panel (`H`, or `?tweaks` to open on load; "log values to console"
+dumps numbers to paste back into `Waves.js` / `Etherium.js`). Then call milestone 1 done and start
+milestone 2.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
