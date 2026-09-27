@@ -25,7 +25,8 @@ const starLayer = Fn( ( [ dir, scale, density ] ) => {
 export class Starfield {
 
 	// horizon: optional vec3 node (the sea's fog colour) for the horizon band and below-horizon fill
-	constructor( scene, { horizon = vec3( 0.10, 0.02, 0.09 ) } = {} ) {
+	// underwater: optional 0/1 node; when 1 the whole backdrop becomes the (underwater) fog colour
+	constructor( scene, { horizon = vec3( 0.10, 0.02, 0.09 ), underwater = float( 0 ) } = {} ) {
 
 		scene.backgroundNode = Fn( () => {
 
@@ -43,7 +44,7 @@ export class Starfield {
 			const sky = base.add( haze ).add( stars ).add( horizon.mul( exp( dir.y.mul( - 14.0 ) ) ).mul( 0.8 ) );
 			// below the horizon we're looking at the (fogged) sea beyond the grid edge
 			const below = mix( horizon, horizon.mul( 0.3 ), smoothstep( 0.0, - 0.35, dir.y ) );
-			return select( dir.y.lessThan( 0.0 ), below, sky );
+			return mix( select( dir.y.lessThan( 0.0 ), below, sky ), horizon, underwater );
 
 		} )();
 

@@ -40,7 +40,7 @@ export class App {
 		console.info( `[etherwake] renderer backend: ${ this.backend }` );
 
 		this.sea = new Etherium( this.scene );
-		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor } );
+		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater } );
 		this.tweaks = new TweakPanel( this );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );

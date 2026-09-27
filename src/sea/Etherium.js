@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import {
 	Fn, uniform, float, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, reflect, select,
-	positionGeometry, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
+	positionGeometry, attribute, round, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
 	mx_fractal_noise_float, mx_noise_float
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
@@ -97,6 +97,7 @@ export class Etherium {
 		this.uSunDir = uniform( new THREE.Vector3( - 0.6, 0.25, - 0.75 ).normalize() );
 		this.uFogColor = uniform( PALETTE.fogAbove.clone() );
 		this.uFogDensity = uniform( FOG.above );
+		this.uUnderwater = uniform( 0 );
 		this.uWaves = WAVES.map( () => ( { a: uniform( new THREE.Vector4() ), b: uniform( new THREE.Vector4() ) } ) );
 		this.refresh();
 
@@ -131,12 +132,25 @@ export class Etherium {
 		geo.rotateX( - Math.PI / 2 );
 		const pos = geo.attributes.position;
 		const remap = ( u ) => HALF * u * ( CENTER + ( 1 - CENTER ) * u * u );
+		// local vertex spacing rounded down to SNAP * 2^n: the shader snaps each vertex to this
+		// world-fixed lattice, so waves don't swim across the sparse outer grid as it follows the camera
+		const step = ( u ) => {
+
+			const ds = HALF * ( CENTER + 3 * ( 1 - CENTER ) * u * u ) * 2 / SEGMENTS;
+			return SNAP * Math.pow( 2, Math.max( 0, Math.floor( Math.log2( ds / SNAP ) + 1e-6 ) ) );
+
+		};
+		const steps = new Float32Array( pos.count * 2 );
 		for ( let i = 0; i < pos.count; i ++ ) {
 
-			pos.setX( i, remap( pos.getX( i ) ) );
-			pos.setZ( i, remap( pos.getZ( i ) ) );
+			const u = pos.getX( i ), v = pos.getZ( i );
+			pos.setX( i, remap( u ) );
+			pos.setZ( i, remap( v ) );
+			steps[ i * 2 ] = step( u );
+			steps[ i * 2 + 1 ] = step( v );
 
 		}
+		geo.setAttribute( 'snapStep', new THREE.BufferAttribute( steps, 2 ) );
 		geo.computeBoundingSphere();
 		return geo;
 
@@ -152,14 +166,15 @@ export class Etherium {
 
 		mat.positionNode = Fn( () => {
 
-			const p = positionGeometry.xz.add( this.uOffset );
+			const step = attribute( 'snapStep', 'vec2' );
+			const p = round( positionGeometry.xz.add( this.uOffset ).div( step ) ).mul( step ).toVar();
 			const w = etheriumWaves( p, this.uWaves, this.uTime, this.uHeight, cameraPosition.xz );
 
 			vNormal.assign( normalize( cross( w.bin, w.tan ) ) );
 			vWorld.assign( vec3( p.x.add( w.disp.x ), w.disp.y, p.y.add( w.disp.z ) ) );
 			vCrest.assign( w.disp.y.div( this.uMaxAmp ) );
 			vJacobian.assign( w.jacobian );
-			return positionGeometry.add( w.disp );
+			return vec3( p.x.sub( this.uOffset.x ), 0, p.y.sub( this.uOffset.y ) ).add( w.disp );
 
 		} )();
 
@@ -185,7 +200,7 @@ export class Etherium {
 			const crest = smoothstep( - 0.3, 0.75, vCrest );
 			const trough = mix( c( 'troughA' ), c( 'troughB' ), tint );
 			const hot = mix( c( 'crestA' ), c( 'crestB' ), tint.oneMinus() );
-			const glow = mix( float( 0.9 ), float( 1.0 ), crest ).mul( cloud.mul( 1.1 ).add( 0.35 ) );
+			const glow = mix( float( 0.5 ), float( 1.1 ), crest ).mul( cloud.mul( 1.3 ).add( 0.2 ) );
 			const col = mix( trough, hot, crest.mul( crest ) ).mul( glow ).toVar();
 
 			// foam where the surface pinches (low Jacobian), sparkles on foam and high crests
@@ -274,6 +289,7 @@ export class Etherium {
 		this.underwater = camera.position.y < this.heightAt( camera.position.x, camera.position.z );
 		this.uFogColor.value.copy( this.underwater ? PALETTE.fogBelow : PALETTE.fogAbove );
 		this.uFogDensity.value = this.underwater ? FOG.below : FOG.above;
+		this.uUnderwater.value = this.underwater ? 1 : 0;
 
 	}
 
