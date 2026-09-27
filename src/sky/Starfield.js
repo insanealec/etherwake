@@ -25,7 +25,7 @@ const starLayer = Fn( ( [ dir, scale, density ] ) => {
 export class Starfield {
 
 	// horizon: optional vec3 node (the sea's fog colour) for the horizon band and below-horizon fill
-	constructor( scene, { horizon = vec3( 0.26, 0.08, 0.22 ) } = {} ) {
+	constructor( scene, { horizon = vec3( 0.10, 0.02, 0.09 ) } = {} ) {
 
 		scene.backgroundNode = Fn( () => {
 

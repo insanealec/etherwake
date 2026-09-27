@@ -16,17 +16,18 @@ const SEGMENTS = 512;
 const CENTER = 0.06;
 const SNAP = HALF * CENTER * 2 / SEGMENTS;
 
+// Linear-space colours (they brighten and desaturate after sRGB output, so keep them saturated).
 const PALETTE = {
-	troughA: new THREE.Color( 0.02, 0.20, 0.30 ), // teal
-	troughB: new THREE.Color( 0.14, 0.04, 0.30 ), // violet
-	crestA: new THREE.Color( 1.00, 0.58, 0.18 ), // gold
-	crestB: new THREE.Color( 1.00, 0.32, 0.42 ), // rose
-	foam: new THREE.Color( 1.00, 0.88, 0.70 ),
-	rim: new THREE.Color( 0.55, 0.30, 0.75 ),
-	sun: new THREE.Color( 1.00, 0.80, 0.55 ),
-	underside: new THREE.Color( 0.20, 0.06, 0.32 ),
-	fogAbove: new THREE.Color( 0.26, 0.08, 0.22 ),
-	fogBelow: new THREE.Color( 0.10, 0.03, 0.20 )
+	troughA: new THREE.Color( 0.00, 0.14, 0.20 ), // teal
+	troughB: new THREE.Color( 0.08, 0.015, 0.24 ), // violet
+	crestA: new THREE.Color( 1.00, 0.32, 0.03 ), // gold
+	crestB: new THREE.Color( 1.00, 0.10, 0.16 ), // rose
+	foam: new THREE.Color( 1.00, 0.70, 0.42 ),
+	rim: new THREE.Color( 0.30, 0.10, 0.55 ),
+	sun: new THREE.Color( 1.00, 0.60, 0.30 ),
+	underside: new THREE.Color( 0.08, 0.015, 0.16 ),
+	fogAbove: new THREE.Color( 0.10, 0.02, 0.09 ),
+	fogBelow: new THREE.Color( 0.04, 0.008, 0.10 )
 };
 
 const FOG_ABOVE = 0.0011;
@@ -172,30 +173,31 @@ export class Etherium {
 			const n = normalize( vNormal );
 			const N = select( frontFacing, n, n.negate() );
 			const V = normalize( cameraPosition.sub( P ) );
-			const fres = pow( max( dot( N, V ), 0 ).oneMinus(), 5 );
+			const fres = pow( max( dot( N, V ), 0 ).oneMinus(), 8 );
 
 			// cloudy texture and large-scale colour drift
 			const cloud = mx_fractal_noise_float( vec3( P.xz.mul( 0.015 ), t.mul( 0.04 ) ), 4, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 ).clamp();
 			const tint = mx_noise_float( vec3( P.xz.mul( 0.005 ), t.mul( 0.02 ) ) ).mul( 0.5 ).add( 0.5 ).clamp();
 
 			// troughs teal/violet, crests gold/rose, glow rising with height
-			const crest = smoothstep( - 0.45, 0.9, vCrest );
+			const crest = smoothstep( - 0.3, 0.75, vCrest );
 			const trough = mix( c( 'troughA' ), c( 'troughB' ), tint );
 			const hot = mix( c( 'crestA' ), c( 'crestB' ), tint.oneMinus() );
-			const glow = mix( float( 0.22 ), float( 1.5 ), crest.mul( crest ) ).mul( cloud.mul( 0.7 ).add( 0.55 ) );
+			const glow = mix( float( 0.9 ), float( 1.0 ), crest ).mul( cloud.mul( 1.1 ).add( 0.35 ) );
 			const col = mix( trough, hot, crest.mul( crest ) ).mul( glow ).toVar();
 
 			// foam where the surface pinches (low Jacobian), sparkles on foam and high crests
-			const foam = smoothstep( 0.72, 0.4, vJacobian ).mul( cloud.mul( 0.6 ).add( 0.4 ) );
-			col.assign( mix( col, c( 'foam' ).mul( 1.6 ), foam.mul( 0.75 ) ) );
+			const foam = smoothstep( 0.6, 0.3, vJacobian ).mul( cloud.mul( 0.6 ).add( 0.4 ) );
+			col.assign( mix( col, c( 'foam' ), foam.mul( 0.55 ) ) );
 			const sp = mx_noise_float( vec3( P.xz.mul( 1.4 ), t.mul( 1.2 ) ) );
-			const sparkle = smoothstep( 0.5, 0.72, sp ).mul( foam.add( pow( crest, 6 ) ) );
-			col.addAssign( c( 'foam' ).mul( sparkle ).mul( 2.5 ) );
+			const near = smoothstep( 160, 20, length( cameraPosition.sub( P ) ) );
+			const sparkle = smoothstep( 0.62, 0.8, sp ).mul( foam.add( pow( crest, 8 ).mul( 0.5 ) ) ).mul( near );
+			col.addAssign( c( 'foam' ).mul( sparkle ).mul( 2.0 ) );
 
 			// sun glint and fresnel rim
 			const R = reflect( V.negate(), N );
 			col.addAssign( c( 'sun' ).mul( pow( max( dot( R, this.uSunDir ), 0 ), 90 ).mul( 1.5 ) ) );
-			col.addAssign( c( 'rim' ).mul( fres ).mul( 1.2 ) );
+			col.addAssign( c( 'rim' ).mul( fres ).mul( 0.35 ) );
 
 			// underside: a dim violet glow seen through the fog
 			const under = c( 'underside' ).mul( cloud.mul( 0.8 ).add( 0.3 ) ).add( c( 'crestB' ).mul( crest.mul( 0.25 ) ) );

@@ -3,14 +3,22 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 1, the Etherium (not started)
-- **Last session (2026-09-27):** research, concept and plan written; milestone 0 scaffold done. Vite plus
-  three.js 0.186 WebGPURenderer, TSL procedural starfield and nebula haze, fly camera, placeholder brass
-  torus-knot and asteroids. Confirmed running on the WebGPU backend in the built-in browser.
+- **Current milestone:** 1, the Etherium (in progress)
+- **Last session (2026-09-27):** first milestone 1 slice. `src/sea/Waves.js` (the SEA/WAVES parameter
+  table, 6 Gerstner waves) drives both `Etherium.heightAt`/`normalAt` (JS, with a fixed-point solve for the
+  horizontal displacement) and `etheriumWaves` (TSL vertex displacement plus tangent, binormal and Jacobian).
+  Camera-following nonlinear grid (512², ~0.6 m at the centre, 2.5 km half-extent), small waves fade with
+  distance. Unlit emissive shading: teal/violet troughs, gold/rose crests, cloud noise, Jacobian foam,
+  near-camera sparkles, sun glint, fresnel rim, underside glow. Scene density fog swaps to thick violet
+  under the surface; the starfield got a horizon band and a fog-coloured fill below the horizon. 60 fps.
+  Placeholder torus-knot and asteroids removed. **Palette gotcha:** colours are linear, so keep them very
+  saturated (sRGB output turns (1, .45, .3) into pale peach).
 
 ## Next up
-Start **milestone 1**. First session target: replace the placeholder asteroids with a Gerstner swell surface
-(TSL vertex displacement) with a glowing crest shader and fog below, and look at it with the fly camera.
+Continue **milestone 1**: the lil-gui tweak panel (`H` toggles) for SEA/WAVES (call `sea.refresh()` after
+edits) and the palette; then polish: the faint horizon seam line seen from underwater, grid swimming at
+distance when the grid snaps (the nonlinear grid only aligns near the centre), and the dusk look (troughs
+read a bit milky from low angles). Then call milestone 1 done and start milestone 2.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
