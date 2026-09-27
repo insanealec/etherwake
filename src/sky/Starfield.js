@@ -1,4 +1,4 @@
-import { Fn, vec3, float, floor, fract, sin, dot, length, smoothstep, mix, pow, max, positionWorldDirection, mx_fractal_noise_float } from 'three/tsl';
+import { Fn, vec3, float, floor, fract, sin, dot, length, smoothstep, mix, pow, max, exp, select, positionWorldDirection, mx_fractal_noise_float } from 'three/tsl';
 
 // cheap float hash of a 3D cell id -> [0,1)
 const hash3 = Fn( ( [ p ] ) => fract( sin( dot( p, vec3( 127.1, 311.7, 74.7 ) ) ).mul( 43758.5453 ) ) );
@@ -24,7 +24,8 @@ const starLayer = Fn( ( [ dir, scale, density ] ) => {
 // Placeholder for the full sky (sun, gas giant, rings) in milestone 3.
 export class Starfield {
 
-	constructor( scene ) {
+	// horizon: optional vec3 node (the sea's fog colour) for the horizon band and below-horizon fill
+	constructor( scene, { horizon = vec3( 0.26, 0.08, 0.22 ) } = {} ) {
 
 		scene.backgroundNode = Fn( () => {
 
@@ -39,7 +40,10 @@ export class Starfield {
 			const haze = mix( vec3( 0.10, 0.03, 0.16 ), vec3( 0.02, 0.07, 0.14 ), n2 ).mul( pow( max( n, 0.0 ), 2.5 ).mul( 1.6 ) );
 
 			const base = vec3( 0.006, 0.004, 0.014 );
-			return base.add( haze ).add( stars );
+			const sky = base.add( haze ).add( stars ).add( horizon.mul( exp( dir.y.mul( - 14.0 ) ) ).mul( 0.8 ) );
+			// below the horizon we're looking at the (fogged) sea beyond the grid edge
+			const below = mix( horizon, horizon.mul( 0.3 ), smoothstep( 0.0, - 0.35, dir.y ) );
+			return select( dir.y.lessThan( 0.0 ), below, sky );
 
 		} )();
 
