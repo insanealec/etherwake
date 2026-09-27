@@ -3,7 +3,19 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 2, solar surfer (not started). Milestone 1 done.
+- **Current milestone:** 2, solar surfer (first slice done, needs hands-on tuning).
+- **Milestone 2 so far (2026-09-27):** `src/player/Surfer.js` rides `sea.heightAt`/`normalAt` at 120 Hz
+  substeps: slope pull (normal's horizontal part), W thrust, S brake, grip on sideways slip, linear +
+  quadratic drag, speed-scaled carving, Space jump (plus the surface's own lift), air spin, and landing via
+  a surface-following vertical speed (capped at 20 m/s). Numbers in `src/game/Gear.js` (`BOARD`). Primitive
+  board, mast, sail and rider with lean and crouch. `src/core/ChaseCamera.js` (spring-damped, follows travel
+  direction, dips on landing, stays above the sea). `F` toggles fly/surf, `?fly` starts in fly, `R` resets.
+  `Input.wasPressed` / `tap` for edge-triggered keys. `App.time` is a game clock (sum of capped dt) so tab
+  switches don't jump the sea. HUD shows the controls and speed. Sail cruise ~10.5 m/s riding straight
+  downwind (the board catches the swell ahead, which moves ~11 m/s); natural crest launches are rare at
+  these speeds (big swells are gentle), so air comes from a timed Space near a crest.
+  **Testing:** with the pane hidden, drive frames with a fake clock:
+  `t += 1000 / 60; __ew.frame( t )` in a loop (don't mix with live rAF timestamps).
 - **Milestone 1 summary (2026-09-27):** `src/sea/Waves.js` (the SEA/WAVES table, 6 Gerstner waves) drives
   both `Etherium.heightAt`/`normalAt` (JS, fixed-point solve for the horizontal displacement) and
   `etheriumWaves` (TSL vertex displacement plus tangent, binormal and Jacobian). Camera-following nonlinear
@@ -18,10 +30,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Start **milestone 2**: `src/player/Surfer.js` board physics on `sea.heightAt`/`normalAt` (gravity along the
-slope, drag, grip, sail thrust, jumping off crests), a spring-damped chase camera with `F` toggling the fly
-camera, and a primitive board and rider. First slice: a board that floats on and slides down the swells
-under keyboard steering, with the chase camera.
+Continue **milestone 2** (the feel): get the user's hands-on impressions, then tune. Likely next steps: a
+`BOARD` folder in the tweak panel; add a wind direction plus sail trim (thrust = wind · heading × trim)
+instead of flat W thrust; a stronger "pumping" push on down-slopes and more slope pull so riding a face
+beats the sail; crest pop (bonus lift when jumping at the top of a rising face); a wake/spray trail so speed
+reads. The make-or-break question: does carving down a swell and launching off a crest feel good?
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

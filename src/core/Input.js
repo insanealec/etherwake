@@ -6,10 +6,16 @@ export class Input {
 
 		this.element = element;
 		this.keys = new Set();
+		this.pressed = new Set(); // keys that went down this frame
 		this.mouseDX = 0;
 		this.mouseDY = 0;
 
-		window.addEventListener( 'keydown', ( e ) => this.keys.add( e.code ) );
+		window.addEventListener( 'keydown', ( e ) => {
+
+			this.keys.add( e.code );
+			if ( ! e.repeat ) this.pressed.add( e.code );
+
+		} );
 		window.addEventListener( 'keyup', ( e ) => this.keys.delete( e.code ) );
 		window.addEventListener( 'blur', () => this.keys.clear() );
 
@@ -31,6 +37,26 @@ export class Input {
 	down( code ) {
 
 		return this.keys.has( code );
+
+	}
+
+	// true on the frame the key went down
+	wasPressed( code ) {
+
+		return this.pressed.has( code );
+
+	}
+
+	// simulate a key press for automated tests: __ew.input.tap( 'Space' )
+	tap( code ) {
+
+		this.pressed.add( code );
+
+	}
+
+	endFrame() {
+
+		this.pressed.clear();
 
 	}
 

@@ -3,6 +3,8 @@ import { Starfield } from './sky/Starfield.js';
 import { Etherium } from './sea/Etherium.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
+import { ChaseCamera } from './core/ChaseCamera.js';
+import { Surfer } from './player/Surfer.js';
 import { Input } from './core/Input.js';
 
 // Top-level app: owns the renderer, scene, camera and the frame loop.
@@ -26,6 +28,7 @@ export class App {
 		this.camera.position.set( 0, 18, 40 );
 
 		this.clock = new THREE.Timer();
+		this.time = 0; // game time: advances by the capped dt, so tab switches don't jump the sea
 		this.input = new Input( this.renderer.domElement );
 		this.fly = new FlyCamera( this.camera, this.input );
 
@@ -42,20 +45,76 @@ export class App {
 		this.sea = new Etherium( this.scene );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater } );
 		this.tweaks = new TweakPanel( this );
+		this.buildLights();
+
+		this.surfer = new Surfer( this.scene, this.sea );
+		this.chase = new ChaseCamera( this.camera, this.sea );
+		this.surfer.onLand = ( impact ) => this.chase.land( impact );
+		this.chase.snap( this.surfer );
+		this.hud = document.getElementById( 'hud' );
+		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
+
+	}
+
+	// Key light roughly matching the sea's sun glint, plus a violet/rose sky fill.
+	// Placeholder until the sky milestone owns lighting.
+	buildLights() {
+
+		const sun = new THREE.DirectionalLight( 0xffd2a0, 2.5 );
+		sun.position.copy( this.sea.uSunDir.value ).multiplyScalar( 100 );
+		this.scene.add( sun );
+		this.scene.add( new THREE.HemisphereLight( 0x8a6cff, 0xff6a50, 0.9 ) );
+
+	}
+
+	// 'surf' (chase camera, surfer controls) or 'fly' (free debug camera; the surfer coasts)
+	setMode( mode ) {
+
+		this.mode = mode;
+		if ( mode === 'fly' ) this.fly.euler.setFromQuaternion( this.camera.quaternion );
+		else this.chase.snap( this.surfer );
+		this.fly.enabled = mode === 'fly';
+		this.hudHint = mode === 'fly'
+			? 'FLY · Click to look · WASD move · Space/C up/down · Shift fast · F surf · H tweaks'
+			: 'SURF · A/D carve · W sail · S brake · Space jump · R reset · F fly cam · H tweaks';
 
 	}
 
 	frame( time ) {
 
 		this.clock.update( time );
-		const dt = Math.min( this.clock.getDelta(), 0.1 );
+		const dt = Math.max( 0, Math.min( this.clock.getDelta(), 0.1 ) );
+		const input = this.input;
 
-		this.fly.update( dt );
-		this.sea.update( this.clock.getElapsed(), this.camera );
+		if ( input.wasPressed( 'KeyF' ) ) this.setMode( this.mode === 'fly' ? 'surf' : 'fly' );
 
+		this.time += dt;
+		this.sea.update( this.time, this.camera );
+
+		const surf = this.mode === 'surf';
+		const key = ( c ) => surf && input.down( c ) ? 1 : 0;
+		if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
+		this.surfer.update( dt, {
+			steer: key( 'KeyD' ) - key( 'KeyA' ),
+			throttle: key( 'KeyW' ) - key( 'KeyS' ),
+			jump: surf && input.wasPressed( 'Space' )
+		} );
+
+		if ( surf ) this.chase.update( dt, this.surfer );
+		else this.fly.update( dt );
+
+		this.updateHud();
+		input.endFrame();
 		this.renderer.render( this.scene, this.camera );
+
+	}
+
+	updateHud() {
+
+		const text = `${ this.hudHint }  ·  ${ this.surfer.speed.toFixed( 0 ) } m/s${ this.surfer.grounded ? '' : ' · air' }`;
+		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}
 
