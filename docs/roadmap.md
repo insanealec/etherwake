@@ -20,6 +20,12 @@
   0.7 to 1.6 s depending on timing), slope pull 1.3, a glowing foamy wake ribbon (`src/player/Wake.js`,
   re-draped on the moving surface each frame), point of sail and power in the HUD, and Board and Wind
   folders in the tweak panel. Measured: ~11 m/s running, ~18.6 m/s on a beam reach (across the swells).
+  **Slice 3 (2026-09-28), from user feedback** ("can't catch up to jump off a wave; the pull stops you
+  going reverse over a wave"): faster board (running ~20 m/s now outruns the ~11 m/s swells, beam ~24),
+  a wind-free `pump` on W so upwind still crawls (~10 m/s), a narrower no-go zone (>150°), asymmetric slope
+  pull (`slopeUp` 0.55 when climbing, `slope` 1.3 when descending), floatier `airGravity` 9, and
+  `maxLaunch` 15 m/s. Timed jumps (auto-jump on a rising face): upwind into the swells ~3.9 s / 14 m,
+  beam ~2.9 s, running ~2 s; untimed jumps ~1.4 s.
   **Testing:** with the pane hidden, drive frames with a fake clock:
   `t += 1000 / 60; __ew.frame( t )` in a loop (don't mix with live rAF timestamps).
 - **Milestone 1 summary (2026-09-27):** `src/sea/Waves.js` (the SEA/WAVES table, 6 Gerstner waves) drives

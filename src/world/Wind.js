@@ -27,8 +27,8 @@ export function sailPower( yaw, out = {} ) {
 
 	out.theta = theta;
 	out.side = fx * wz - fz * wx >= 0 ? 1 : - 1;
-	out.efficiency = WIND.strength * smooth( 145, 120, deg ) * ( 0.6 + 0.5 * Math.sin( theta ) );
-	out.name = deg < 30 ? 'running' : deg < 70 ? 'broad reach' : deg < 110 ? 'beam reach' : deg < 140 ? 'close reach' : 'in irons';
+	out.efficiency = WIND.strength * smooth( 160, 135, deg ) * ( 0.8 + 0.3 * Math.sin( theta ) );
+	out.name = deg < 30 ? 'running' : deg < 70 ? 'broad reach' : deg < 110 ? 'beam reach' : deg < 150 ? 'close reach' : 'in irons';
 	return out;
 
 }

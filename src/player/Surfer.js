@@ -93,11 +93,13 @@ export class Surfer {
 			this.yaw -= steer * B.turnRate * Math.min( 1, 0.3 + speed / B.turnMinSpeed ) * h;
 			const fx = Math.sin( this.yaw ), fz = Math.cos( this.yaw );
 
-			// slope pull (the normal's horizontal part points downhill) and sail thrust,
-			// scaled by the point of sail (fastest on a beam reach, nothing head to wind)
-			const push = B.thrust * sailPower( this.yaw, this.sailState ).efficiency * Math.max( 0, throttle );
-			v.x += ( B.gravity * B.slope * _n.x + fx * push ) * h;
-			v.z += ( B.gravity * B.slope * _n.z + fz * push ) * h;
+			// slope pull (the normal's horizontal part points downhill): full strength when it speeds
+			// you up, weaker when it slows you, so you can carry speed up a face to the lip
+			const slope = _n.x * v.x + _n.z * v.z >= 0 ? B.slope : B.slopeUp;
+			// sail thrust scaled by the point of sail (fastest on a beam reach), plus a wind-free pump
+			const push = ( B.thrust * sailPower( this.yaw, this.sailState ).efficiency + B.pump ) * Math.max( 0, throttle );
+			v.x += ( B.gravity * slope * _n.x + fx * push ) * h;
+			v.z += ( B.gravity * slope * _n.z + fz * push ) * h;
 
 			// grip: bleed the sideways part of the velocity
 			const fwd = v.x * fx + v.z * fz;
@@ -114,7 +116,7 @@ export class Surfer {
 			if ( jump ) {
 
 				// crest pop: jumping off a rising face adds part of the surface's lift
-				v.y += B.jump + B.pop * Math.max( 0, v.y );
+				v.y = Math.min( B.maxLaunch, v.y + B.jump + B.pop * Math.max( 0, v.y ) );
 				this.grounded = false;
 
 			}
@@ -127,7 +129,7 @@ export class Surfer {
 
 		// vertical: ballistic, then resolve against the surface
 		const yPrev = p.y;
-		v.y -= B.gravity * h;
+		v.y -= B.airGravity * h;
 		p.x += v.x * h;
 		p.y += v.y * h;
 		p.z += v.z * h;

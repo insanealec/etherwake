@@ -49,8 +49,8 @@ export class TweakPanel {
 
 		const board = gui.addFolder( 'Board' ).close();
 		const ranges = {
-			gravity: [ 2, 30 ], slope: [ 0, 3 ], thrust: [ 0, 15 ], brake: [ 0, 5 ], drag: [ 0, 0.5 ], dragQuad: [ 0, 0.05 ],
-			grip: [ 0, 20 ], turnRate: [ 0.2, 4 ], turnMinSpeed: [ 0, 20 ], jump: [ 0, 20 ], pop: [ 0, 3 ], airTurn: [ 0, 8 ], liftOff: [ 0, 1 ]
+			gravity: [ 2, 30 ], airGravity: [ 2, 30 ], slope: [ 0, 3 ], slopeUp: [ 0, 3 ], thrust: [ 0, 15 ], pump: [ 0, 8 ], brake: [ 0, 5 ], drag: [ 0, 0.5 ], dragQuad: [ 0, 0.05 ],
+			grip: [ 0, 20 ], turnRate: [ 0.2, 4 ], turnMinSpeed: [ 0, 20 ], jump: [ 0, 20 ], pop: [ 0, 3 ], maxLaunch: [ 5, 40 ], airTurn: [ 0, 8 ], liftOff: [ 0, 1 ]
 		};
 		for ( const key of Object.keys( BOARD ) ) board.add( BOARD, key, ...( ranges[ key ] || [] ) );
 
