@@ -13,6 +13,9 @@ import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
+import { Port } from './world/Port.js';
+import { SPAWN } from './world/WorldLayout.js';
+import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
 import { Input } from './core/Input.js';
 
@@ -61,7 +64,9 @@ export class App {
 		this.buildPipeline();
 		this.buildLights();
 
+		this.port = new Port( this.scene );
 		this.surfer = new Surfer( this.scene, this.sea );
+		this.surfer.reset( SPAWN.x, SPAWN.z, SPAWN.yaw );
 		this.wake = new Wake( this.scene, this.sea );
 		this.spray = new Spray( this.scene );
 		this.chase = new ChaseCamera( this.camera, this.sea );
@@ -135,6 +140,8 @@ export class App {
 			throttle: key( 'KeyW' ) - key( 'KeyS' ),
 			jump: surf && input.wasPressed( 'Space' )
 		} );
+		this.port.collide( this.surfer );
+		this.port.update( dt, WIND.angle );
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
 

@@ -5,6 +5,17 @@ import {
 	mx_fractal_noise_float, mx_noise_float
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
+import { HARBOR } from '../world/WorldLayout.js';
+
+// Harbour calm: swells shrink to HARBOR.calm near the port. Shared by the JS and TSL wave functions.
+const uHarbor = uniform( new THREE.Vector4( HARBOR.x, HARBOR.z, HARBOR.calmRadius, HARBOR.fadeRadius ) );
+function harborCalm( x, z ) {
+
+	const d = Math.hypot( x - HARBOR.x, z - HARBOR.z );
+	const t = Math.max( 0, Math.min( 1, ( d - HARBOR.calmRadius ) / ( HARBOR.fadeRadius - HARBOR.calmRadius ) ) );
+	return HARBOR.calm + ( 1 - HARBOR.calm ) * t * t * ( 3 - 2 * t );
+
+}
 
 const TAU = Math.PI * 2;
 
@@ -57,6 +68,7 @@ function waveConstants() {
 export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 
 	const dist = length( p.sub( fadeFrom ) );
+	const calm = mix( float( HARBOR.calm ), float( 1 ), smoothstep( uHarbor.z, uHarbor.w, length( p.sub( uHarbor.xy ) ) ) );
 	const disp = vec3( 0 ).toVar();
 	const tan = vec3( 1, 0, 0 ).toVar();
 	const bin = vec3( 0, 0, 1 ).toVar();
@@ -64,7 +76,7 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 	for ( const { a, b } of waves ) {
 
 		const dx = a.x, dz = a.y, k = a.z;
-		const s = a.w.mul( smoothstep( b.y, b.z, dist ).oneMinus() );
+		const s = a.w.mul( smoothstep( b.y, b.z, dist ).oneMinus() ).mul( calm );
 		const f = k.mul( dot( a.xy, p ) ).sub( b.x.mul( time ) );
 		const c = cos( f ), sn = sin( f );
 		const amp = s.div( k );
@@ -239,13 +251,14 @@ export class Etherium {
 	// JS twin of etheriumWaves: displacement and normal of the grid point (x, z).
 	sampleGrid( x, z, t, out ) {
 
-		const H = SEA.height;
+		const H = SEA.height, calm = harborCalm( x, z );
 		let dx = 0, dy = 0, dz = 0, tx = 1, ty = 0, tz = 0, bx = 0, by = 0, bz = 1;
 		for ( const w of this.waves ) {
 
 			const f = w.k * ( w.dx * x + w.dz * z ) - w.omega * t;
 			const c = Math.cos( f ), sn = Math.sin( f );
-			const amp = w.s / w.k, ss = w.s * sn, sc = w.s * c * H;
+			const s = w.s * calm;
+			const amp = s / w.k, ss = s * sn, sc = s * c * H;
 			dx += w.dx * amp * c; dy += amp * sn * H; dz += w.dz * amp * c;
 			tx -= w.dx * w.dx * ss; ty += w.dx * sc; tz -= w.dx * w.dz * ss;
 			bx -= w.dx * w.dz * ss; by += w.dz * sc; bz -= w.dz * w.dz * ss;

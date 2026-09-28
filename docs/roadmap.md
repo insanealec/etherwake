@@ -3,8 +3,19 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 3, sky (slices 1 and 2 done). Milestone 2 done: the user play-tested it ("feels good to
-  run against the waves and jump and spin").
+- **Current milestone:** 4, the port (slice 1 done). Milestones 2 and 3 done (the optional sun drift is
+  deferred to polish).
+- **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
+  variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
+  "test" values the user sets in the tweak panel.
+- **Milestone 4 slice 1 (2026-09-28):** `src/world/WorldLayout.js` (`HARBOR`, `SPAWN`). Harbour calm in the
+  shared wave function: swells shrink to 10% inside 140 m and back to full by 320 m (`harborCalm` in JS,
+  `uHarbor` in TSL, both in `Etherium.js`). `src/world/Port.js`, procedural: a smooth lumpy moonlet
+  (`mergeVertices` for smooth normals), a boardwalk ring (42 to 54 m), four piers (52 m) on instanced
+  pilings, instanced lantern posts, pier-end point lights, shacks with lit windows, banners that stream
+  downwind, a lighthouse with a sweeping additive beam. 2D colliders (ring circle + pier rectangles)
+  push the board out and bounce it slightly; skipped when the board is above deck height, so you can
+  jump a pier. The surfer spawns off the east pier's end.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -68,12 +79,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 3 is nearly done: optionally a slow time-of-light shift (sun colour and height drifting), then
-mark it done and start **milestone 4 (the port)**: a floating dock-town anchored to a small moon, modular
-dock pieces, lanterns, sails and banners (openly licensed models recorded in `CREDITS.md`, or procedural),
-walk-on-foot mode on the dock, vendor NPCs and a dialogue box.
-The user was playing with the wind at strength 2.3 / angle -6 in the tweak panel: ask whether to make
-stronger wind the default.
+Continue **milestone 4**: walk-on-foot mode on the dock (dismount at a pier end, a simple walker with
+deck collision, E to interact), vendor NPCs (primitive figures at the shacks) and a dialogue box UI.
+Openly licensed models (Kenney, Quaternius, Poly Haven) can replace the procedural pieces later: they need
+the user's OK to download, and each goes in `CREDITS.md`.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
@@ -117,7 +126,7 @@ The glowing sea you'll surf on.
 - **Done when:** carving down a swell and launching off a crest feels good. Tune until it does. This is
   the make-or-break milestone.
 
-### 3. Sky
+### 3. Sky ✅
 A sun (a disc plus a lens-flare-ish glow), a gas giant (a TSL shader with animated banded storms), rings
 (a lit ring with transparency), a better star and nebula backdrop, bloom (three `BloomNode` via
 `PostProcessing`), and tone-mapping and exposure tuning. Optional time-of-light shift.
