@@ -31,18 +31,6 @@ export class Port {
 		this.buildLighthouse( mats );
 		this.buildBanners( mats );
 
-		// slips at the pier ends: where you dock (deck spot) and launch (sea spot just past the end)
-		this.slips = PIER_ANGLES.map( ( a ) => {
-
-			const end = RING_OUT + PIER_LEN - 2;
-			return {
-				deck: { x: HARBOR.x + Math.cos( a ) * ( end - 1.5 ), z: HARBOR.z + Math.sin( a ) * ( end - 1.5 ) },
-				sea: { x: HARBOR.x + Math.cos( a ) * ( end + 5 ), z: HARBOR.z + Math.sin( a ) * ( end + 5 ) },
-				yaw: Math.atan2( Math.cos( a ), Math.sin( a ) ) // facing out along the pier
-			};
-
-		} );
-
 		// colliders in world space
 		this.circle = { x: HARBOR.x, z: HARBOR.z, r: RING_OUT };
 		this.rects = PIER_ANGLES.map( ( a ) => {
@@ -216,7 +204,8 @@ export class Port {
 			this.shacks.push( {
 				x: HARBOR.x + Math.cos( a ) * r, z: HARBOR.z + Math.sin( a ) * r,
 				ax: Math.cos( a ), az: Math.sin( a ), halfDepth: 2.5, halfWidth: w / 2, // box footprint, depth along the radius
-				door: { x: HARBOR.x + Math.cos( a ) * ( r + 3.6 ), z: HARBOR.z + Math.sin( a ) * ( r + 3.6 ) },
+				door: { x: HARBOR.x + Math.cos( a ) * ( r + 4.6 ), z: HARBOR.z + Math.sin( a ) * ( r + 4.6 ) }, // at the deck's outer edge
+				mooring: { x: HARBOR.x + Math.cos( a ) * ( RING_OUT + 2.6 ), z: HARBOR.z + Math.sin( a ) * ( RING_OUT + 2.6 ) }, // on the water in front
 				facing: Math.atan2( Math.cos( a ), Math.sin( a ) ) // yaw pointing outward
 			} );
 
@@ -284,6 +273,84 @@ export class Port {
 			b.rotation.y = - windAngle * Math.PI / 180 + Math.sin( this.time * 3 + i ) * 0.15;
 
 		} );
+
+	}
+
+	// Docking from the board: the nearest deck spot within reach of a board at (x, z), or null.
+	dockPoint( x, z ) {
+
+		const cands = [];
+		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
+		if ( r > RING_OUT - 1 && r < RING_OUT + 6 ) cands.push( { x: HARBOR.x + lx / r * ( RING_OUT - 1.2 ), z: HARBOR.z + lz / r * ( RING_OUT - 1.2 ) } );
+		for ( const p of this.rects ) {
+
+			const dx = x - p.x, dz = z - p.z;
+			const along = dx * p.ax + dz * p.az, across = - dx * p.az + dz * p.ax;
+			if ( Math.abs( along ) < p.halfLen + 5 && Math.abs( across ) < p.halfW + 5 ) {
+
+				const a = Math.max( - p.halfLen + 1.2, Math.min( p.halfLen - 1.2, along ) );
+				const c = Math.max( - p.halfW + 1.2, Math.min( p.halfW - 1.2, across ) );
+				cands.push( { x: p.x + p.ax * a - p.az * c, z: p.z + p.az * a + p.ax * c } );
+
+			}
+
+		}
+		let best = null, bestD = 6;
+		for ( const c of cands ) {
+
+			const d = Math.hypot( c.x - x, c.z - z );
+			if ( d < bestD && this.walkable( c.x, c.z ) ) {
+
+				best = c;
+				bestD = d;
+
+			}
+
+		}
+		return best;
+
+	}
+
+	// Launching on foot: if (x, z) is at an outer edge of the deck, the sea spot just past it and the
+	// heading out, else null. The inner ring edge (the moonlet side) doesn't count.
+	launchEdge( x, z ) {
+
+		if ( ! this.walkable( x, z ) ) return null;
+		const out = 3.5;
+		for ( const p of this.rects ) {
+
+			const dx = x - p.x, dz = z - p.z;
+			const along = dx * p.ax + dz * p.az, across = - dx * p.az + dz * p.ax;
+			if ( Math.abs( along ) > p.halfLen || Math.abs( across ) > p.halfW ) continue;
+			if ( along > p.halfLen - 2.5 ) {
+
+				const d = p.halfLen + out;
+				return { x: p.x + p.ax * d - p.az * across, z: p.z + p.az * d + p.ax * across, yaw: Math.atan2( p.ax, p.az ) };
+
+			}
+			if ( Math.abs( across ) > p.halfW - 1.6 && along > - p.halfLen + 3 ) {
+
+				const sgn = Math.sign( across ), c = sgn * ( p.halfW + out );
+				return { x: p.x + p.ax * along - p.az * c, z: p.z + p.az * along + p.ax * c, yaw: Math.atan2( - p.az * sgn, p.ax * sgn ) };
+
+			}
+
+		}
+		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
+		if ( r > RING_OUT - 2.2 ) {
+
+			const sx = HARBOR.x + lx / r * ( RING_OUT + out ), sz = HARBOR.z + lz / r * ( RING_OUT + out );
+			// not where a pier root meets the ring
+			for ( const p of this.rects ) {
+
+				const dx = sx - p.x, dz = sz - p.z;
+				if ( Math.abs( dx * p.ax + dz * p.az ) < p.halfLen + 1 && Math.abs( - dx * p.az + dz * p.ax ) < p.halfW + 1.5 ) return null;
+
+			}
+			return { x: sx, z: sz, yaw: Math.atan2( lx, lz ) };
+
+		}
+		return null;
 
 	}
 

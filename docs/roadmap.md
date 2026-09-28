@@ -25,6 +25,13 @@
   `src/world/Npcs.js` (figures at shack doors, turn to face you): Dockmaster, Shipwright, Tea-seller
   near the east pier. `src/ui/Dialogue.js` + `#dialogue` box: E talks, E/Space advances. `#prompt`
   shows the available action. E at a pier end launches the board.
+- **Milestone 4 slice 3 (2026-09-28), from user feedback** ("the dock is so large, walking to the people and
+  back sucks"): dock and launch anywhere. `port.dockPoint(x, z)` finds the nearest deck spot within 6 m
+  of a slow board; `port.launchEdge(x, z)` returns a sea spot just off any outer deck edge (pier ends and
+  sides, the ring's outer edge; not the moonlet side or pier roots) and the heading out: "picking up the
+  board". Pier-end slips are gone. Talk from the board: each character stands at the ring's outer edge
+  with a glowing mooring buoy on the water in front (`Npcs.nearestMooring`, 7 m); E talks without
+  docking, and the board is held still during dialogue. Walking remains optional.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -88,11 +95,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 4 is functionally there. Ask the user to try docking, walking and talking. Possible polish: a
-proper board-rack / slip visual, motes hidden over the deck, footstep bob for the camera, more NPC
-variety. Then **milestone 5 (the loop)**: job board (courier and race), stardust collectibles, trick
-scoring, the shipwright's upgrade shop (credits modify the `BOARD` / `WIND` numbers via `game/Gear.js`
-tiers), HUD, and saving to localStorage.
+Ask the user to try the new docking and mooring flow. Then **milestone 5 (the loop)**: job board (courier
+and race; the dockmaster could hand jobs out at the mooring), stardust collectibles, trick scoring for
+credits, the shipwright's upgrade shop (credits modify the `BOARD` / `WIND` numbers via `game/Gear.js`
+tiers), a HUD, and saving to localStorage.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

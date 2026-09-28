@@ -78,7 +78,7 @@ export class App {
 		this.chase.snap( this.surfer );
 		this.walker = new Walker( this.scene, this.port );
 		this.walkCam = new WalkCamera( this.camera, this.input, this.port.cameraObstacles );
-		this.npcs = new Npcs( this.scene, this.port );
+		this.npcs = new Npcs( this.scene, this.port, this.sea );
 		this.dialogue = new Dialogue();
 		this.hud = document.getElementById( 'hud' );
 		this.toastEl = document.getElementById( 'toast' );
@@ -138,18 +138,20 @@ export class App {
 
 	}
 
-	// step off the board onto a pier end; the board stays parked in the slip
-	dock( slip ) {
+	// step up onto the deck at `spot`; the board stays floating where you left it
+	dock( spot ) {
 
-		this.surfer.reset( slip.sea.x, slip.sea.z, slip.yaw );
-		this.walker.place( slip.deck.x, slip.deck.z, slip.yaw + Math.PI );
+		const s = this.surfer;
+		s.velocity.set( 0, 0, 0 );
+		this.walker.place( spot.x, spot.z, Math.atan2( spot.x - s.position.x, spot.z - s.position.z ) );
 		this.setMode( 'walk' );
 
 	}
 
-	launch( slip ) {
+	// pick up the board and drop in at `edge` (a sea spot just off the deck), heading out
+	launch( edge ) {
 
-		this.surfer.reset( slip.sea.x, slip.sea.z, slip.yaw );
+		this.surfer.reset( edge.x, edge.z, edge.yaw );
 		this.setMode( 'surf' );
 
 	}
@@ -173,7 +175,8 @@ export class App {
 		else {
 
 			if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
-			this.surfer.update( dt, surf ? {
+			if ( this.dialogue.active ) this.surfer.velocity.multiplyScalar( Math.exp( - 2 * dt ) ); // hold still while talking
+			this.surfer.update( dt, surf && ! this.dialogue.active ? {
 				steer: key( 'KeyD' ) - key( 'KeyA' ),
 				throttle: key( 'KeyW' ) - key( 'KeyS' ),
 				jump: input.wasPressed( 'Space' )
@@ -188,7 +191,7 @@ export class App {
 			this.walker.update( dt, { forward: key( 'KeyW' ) - key( 'KeyS' ), right: key( 'KeyD' ) - key( 'KeyA' ), run: input.down( 'ShiftLeft' ) }, this.walkCam.yaw );
 
 		}
-		this.npcs.update( dt, this.onFoot ? this.walker.position : null );
+		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
@@ -217,14 +220,21 @@ export class App {
 
 			if ( e || input.wasPressed( 'Space' ) ) this.dialogue.next();
 
-		} else if ( this.mode === 'surf' ) {
+		} else if ( this.mode === 'surf' && this.surfer.grounded && this.surfer.speed < 10 ) {
 
+			// slow near a mooring buoy: talk from the board; near any deck edge: step up
 			const s = this.surfer;
-			const slip = this.port.slips.find( ( k ) => Math.hypot( k.sea.x - s.position.x, k.sea.z - s.position.z ) < 16 );
-			if ( slip && s.grounded && s.speed < 10 ) {
+			const npc = this.npcs.nearestMooring( s.position );
+			const spot = npc ? null : this.port.dockPoint( s.position.x, s.position.z );
+			if ( npc ) {
+
+				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
+				if ( e ) this.dialogue.open( npc.name, npc.lines );
+
+			} else if ( spot ) {
 
 				prompt = 'E · step onto the dock';
-				if ( e ) this.dock( slip );
+				if ( e ) this.dock( spot );
 
 			}
 
@@ -232,16 +242,16 @@ export class App {
 
 			const w = this.walker.position;
 			const npc = this.npcs.nearest( w );
-			const slip = this.port.slips.find( ( k ) => Math.hypot( k.deck.x - w.x, k.deck.z - w.z ) < 3 );
+			const edge = npc ? null : this.port.launchEdge( w.x, w.z );
 			if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
 				if ( e ) this.dialogue.open( npc.name, npc.lines );
 
-			} else if ( slip ) {
+			} else if ( edge ) {
 
-				prompt = 'E · launch the board';
-				if ( e ) this.launch( slip );
+				prompt = 'E · drop in with the board';
+				if ( e ) this.launch( edge );
 
 			}
 
