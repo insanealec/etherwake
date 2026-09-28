@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
-	Fn, uniform, float, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, reflect, select,
+	Fn, uniform, float, vec2, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, select,
 	positionGeometry, attribute, round, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
 	mx_fractal_noise_float, mx_noise_float
 } from 'three/tsl';
@@ -190,34 +190,43 @@ export class Etherium {
 			const n = normalize( vNormal );
 			const N = select( frontFacing, n, n.negate() );
 			const V = normalize( cameraPosition.sub( P ) );
-			const fres = pow( max( dot( N, V ), 0 ).oneMinus(), 8 );
+			const L = this.uSunDir;
 
-			// cloudy texture and large-scale colour drift
-			const cloud = mx_fractal_noise_float( vec3( P.xz.mul( 0.015 ), t.mul( 0.04 ) ), 4, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 ).clamp();
+			// gas texture: domain-warped clouds drifting downwind, plus fine wisps stretched along the flow
+			const uvw = P.xz.sub( vec2( 1.6, 0.4 ).mul( t ) );
+			const wx = mx_fractal_noise_float( vec3( uvw.mul( 0.011 ), t.mul( 0.03 ) ), 3, 2.0, 0.5 );
+			const wz = mx_fractal_noise_float( vec3( uvw.mul( 0.011 ).add( 5.2 ), t.mul( 0.03 ) ), 3, 2.0, 0.5 );
+			const q = uvw.add( vec2( wx, wz ).mul( 16.0 ) );
+			const big = mx_fractal_noise_float( vec3( q.mul( 0.035 ), t.mul( 0.05 ) ), 5, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 ).clamp();
+			const wisps = mx_fractal_noise_float( vec3( q.x.mul( 0.08 ), q.y.mul( 0.13 ), t.mul( 0.12 ) ), 3, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 ).clamp();
+			const dens = smoothstep( 0.3, 0.78, big.mul( 0.65 ).add( wisps.mul( 0.35 ) ) );
 			const tint = mx_noise_float( vec3( P.xz.mul( 0.005 ), t.mul( 0.02 ) ) ).mul( 0.5 ).add( 0.5 ).clamp();
 
-			// troughs teal/violet, crests gold/rose, glow rising with height
+			// troughs teal/violet, crests gold/rose; glow rises with height and gas density
 			const crest = smoothstep( - 0.3, 0.75, vCrest );
 			const trough = mix( c( 'troughA' ), c( 'troughB' ), tint );
 			const hot = mix( c( 'crestA' ), c( 'crestB' ), tint.oneMinus() );
-			const glow = mix( float( 0.5 ), float( 1.1 ), crest ).mul( cloud.mul( 1.3 ).add( 0.2 ) );
-			const col = mix( trough, hot, crest.mul( crest ) ).mul( glow ).toVar();
+			// thin gas goes nearly dark, dense gas glows; the densest filaments run hot
+			const lum = mix( float( 0.1 ), float( 1.0 ), dens ).mul( mix( float( 0.55 ), float( 1.35 ), crest ) );
+			const col = mix( trough, hot, crest.mul( crest ) ).mul( lum ).add( hot.mul( pow( dens, 3 ) ).mul( 0.3 ) ).toVar();
 
-			// foam where the surface pinches (low Jacobian), sparkles on foam and high crests
-			const foam = smoothstep( 0.6, 0.3, vJacobian ).mul( cloud.mul( 0.6 ).add( 0.4 ) );
-			col.assign( mix( col, c( 'foam' ), foam.mul( 0.55 ) ) );
-			const sp = mx_noise_float( vec3( P.xz.mul( 1.4 ), t.mul( 1.2 ) ) );
-			const near = smoothstep( 160, 20, length( cameraPosition.sub( P ) ) );
-			const sparkle = smoothstep( 0.62, 0.8, sp ).mul( foam.add( pow( crest, 8 ).mul( 0.5 ) ) ).mul( near );
-			col.addAssign( c( 'foam' ).mul( sparkle ).mul( 2.0 ) );
+			// soft sun-facing shading keeps the swell slopes readable (diffuse, not a glassy highlight)
+			col.mulAssign( mix( float( 0.6 ), float( 1.2 ), dot( N, L ).mul( 0.5 ).add( 0.5 ) ) );
 
-			// sun glint and fresnel rim
-			const R = reflect( V.negate(), N );
-			col.addAssign( c( 'sun' ).mul( pow( max( dot( R, this.uSunDir ), 0 ), 90 ).mul( 1.5 ) ) );
-			col.addAssign( c( 'rim' ).mul( fres ).mul( 0.35 ) );
+			// glowing puffs where crests pinch (low Jacobian), instead of white foam
+			const puff = smoothstep( 0.65, 0.3, vJacobian ).mul( dens );
+			col.addAssign( hot.mul( puff ).mul( 0.7 ) );
+
+			// back-lit gas: looking toward the sun, thin gas glows (a silver lining instead of a glint)
+			const back = pow( max( dot( V.negate(), L ), 0 ), 6 ).mul( dens );
+			col.addAssign( c( 'sun' ).mul( back ).mul( 0.9 ) );
+
+			// grazing angles look through more gas: thicken toward the fog colour
+			const thick = pow( max( dot( N, V ), 0 ).oneMinus(), 6 );
+			col.assign( mix( col, this.uFogColor.mul( 2.2 ).add( c( 'rim' ).mul( 0.15 ) ), thick.mul( 0.3 ) ) );
 
 			// underside: a dim violet glow seen through the fog
-			const under = c( 'underside' ).mul( cloud.mul( 0.8 ).add( 0.3 ) ).add( c( 'crestB' ).mul( crest.mul( 0.25 ) ) );
+			const under = c( 'underside' ).mul( dens.mul( 0.8 ).add( 0.3 ) ).add( c( 'crestB' ).mul( crest.mul( 0.25 ) ) );
 			return select( frontFacing, col, under );
 
 		} )();
