@@ -4,6 +4,8 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
+import { Moon } from './sky/Moon.js';
+import { SunFlare } from './post/SunFlare.js';
 import { Motes, MOTE_LAYERS } from './sea/Motes.js';
 import { Shells } from './sea/Shells.js';
 import { TweakPanel } from './ui/TweakPanel.js';
@@ -52,6 +54,7 @@ export class App {
 		this.sea = new Etherium( this.scene );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
 		this.giant = new GasGiant( this.scene, this.sea.uSunDir );
+		this.moon = new Moon( this.scene, this.sea.uSunDir );
 		if ( ! this.params.has( 'noShells' ) ) this.shells = new Shells( this.scene, this.sea );
 		this.motes = this.params.has( 'noMotes' ) ? [] : Object.values( MOTE_LAYERS ).map( ( layer ) => new Motes( this.scene, this.sea, layer ) );
 		this.tweaks = new TweakPanel( this );
@@ -77,13 +80,15 @@ export class App {
 
 		this.pipeline = new THREE.RenderPipeline( this.renderer );
 		const color = pass( this.scene, this.camera ).getTextureNode( 'output' );
-		if ( this.params.has( 'noBloom' ) ) this.pipeline.outputNode = color;
-		else {
+		this.flare = new SunFlare( this.sea.uSunDir );
+		let out = color.add( this.flare.node );
+		if ( ! this.params.has( 'noBloom' ) ) {
 
 			this.bloom = bloom( color, 0.55, 0.45, 0.85 );
-			this.pipeline.outputNode = color.add( this.bloom );
+			out = out.add( this.bloom );
 
 		}
+		this.pipeline.outputNode = out;
 
 	}
 
@@ -137,6 +142,8 @@ export class App {
 		else this.fly.update( dt );
 
 		this.giant.update( this.time, this.camera );
+		this.moon.update( this.camera );
+		this.flare.update( this.camera );
 		for ( const m of this.motes ) m.update( this.camera, this.surfer );
 		if ( this.shells ) this.shells.update();
 		this.updateHud();

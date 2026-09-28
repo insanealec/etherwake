@@ -20,7 +20,10 @@ const starLayer = Fn( ( [ dir, scale, density ] ) => {
 
 } );
 
-// Procedural sky backdrop: three star layers over a faint two-tone nebula haze, the horizon band,
+// the galaxy band's plane (its normal); the band arcs up from the horizon across the sky
+const GALAXY_NORMAL = vec3( 0.35, 0.55, 0.76 ).normalize();
+
+// Procedural sky backdrop: three star layers over a faint two-tone nebula haze, a galaxy band, the horizon band,
 // and the sun (a hot disc for bloom to catch, a tight corona and a wide warm glow).
 // The gas giant is a separate mesh (sky/GasGiant.js).
 export class Starfield {
@@ -34,16 +37,24 @@ export class Starfield {
 
 			const dir = positionWorldDirection;
 
+			// galaxy band: a great circle across the sky, clumpy glow cut by dark dust lanes, with extra stars
+			const across = dot( dir, GALAXY_NORMAL );
+			const along = mx_fractal_noise_float( dir.mul( 6.0 ), 4, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 );
+			const band = exp( across.mul( across ).mul( - 60.0 ) ).mul( along.mul( 0.8 ).add( 0.4 ) );
+			const lanes = smoothstep( 0.55, 0.75, mx_fractal_noise_float( dir.mul( 11.0 ).add( 3.0 ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 ) );
+			const galaxy = band.mul( lanes.mul( 0.75 ).oneMinus() );
+
 			const stars = starLayer( dir, 90, 0.08 )
-				.add( starLayer( dir, 220, 0.12 ).mul( 0.6 ) )
-				.add( starLayer( dir, 480, 0.2 ).mul( 0.35 ) );
+				.add( starLayer( dir, 220, galaxy.mul( 0.25 ).add( 0.12 ) ).mul( 0.6 ) )
+				.add( starLayer( dir, 480, galaxy.mul( 0.5 ).add( 0.2 ) ).mul( 0.35 ) );
 
 			const n = mx_fractal_noise_float( dir.mul( 2.2 ), 5, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
 			const n2 = mx_fractal_noise_float( dir.mul( 4.0 ).add( 11.0 ), 4, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
 			const haze = mix( vec3( 0.10, 0.03, 0.16 ), vec3( 0.02, 0.07, 0.14 ), n2 ).mul( pow( max( n, 0.0 ), 2.5 ).mul( 1.6 ) );
 
 			const base = vec3( 0.006, 0.004, 0.014 );
-			const sky = base.add( haze ).add( stars ).add( horizon.mul( exp( dir.y.mul( - 14.0 ) ) ).mul( 0.8 ) ).toVar();
+			const glow = mix( vec3( 0.16, 0.09, 0.14 ), vec3( 0.09, 0.08, 0.16 ), along ).mul( galaxy ).mul( 0.55 );
+			const sky = base.add( haze ).add( glow ).add( stars ).add( horizon.mul( exp( dir.y.mul( - 14.0 ) ) ).mul( 0.8 ) ).toVar();
 			if ( sun ) {
 
 				const d = max( dot( dir, sun ), 0.0 );
