@@ -14,6 +14,10 @@ import { ChaseCamera } from './core/ChaseCamera.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
 import { Port } from './world/Port.js';
+import { Npcs } from './world/Npcs.js';
+import { Walker } from './player/Walker.js';
+import { WalkCamera } from './core/WalkCamera.js';
+import { Dialogue } from './ui/Dialogue.js';
 import { SPAWN } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
@@ -72,8 +76,13 @@ export class App {
 		this.chase = new ChaseCamera( this.camera, this.sea );
 		this.surfer.onLand = ( r ) => this.onLand( r );
 		this.chase.snap( this.surfer );
+		this.walker = new Walker( this.scene, this.port );
+		this.walkCam = new WalkCamera( this.camera, this.input, this.port.cameraObstacles );
+		this.npcs = new Npcs( this.scene, this.port );
+		this.dialogue = new Dialogue();
 		this.hud = document.getElementById( 'hud' );
 		this.toastEl = document.getElementById( 'toast' );
+		this.promptEl = document.getElementById( 'prompt' );
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
@@ -108,16 +117,40 @@ export class App {
 
 	}
 
-	// 'surf' (chase camera, surfer controls) or 'fly' (free debug camera; the surfer coasts)
+	// 'surf' (chase camera, board controls), 'walk' (on foot on the dock, orbit camera) or
+	// 'fly' (free debug camera; F returns to whichever mode you left)
 	setMode( mode ) {
 
+		if ( mode === 'fly' && this.mode !== 'fly' ) this.returnMode = this.mode || 'surf';
 		this.mode = mode;
-		if ( mode === 'fly' ) this.fly.euler.setFromQuaternion( this.camera.quaternion );
-		else this.chase.snap( this.surfer );
+		this.onFoot = mode === 'walk' || ( mode === 'fly' && this.returnMode === 'walk' );
+		this.walker.visible = this.onFoot;
+		this.surfer.riderVisible = ! this.onFoot;
 		this.fly.enabled = mode === 'fly';
-		this.hudHint = mode === 'fly'
-			? 'FLY · click to look · WASD · Space/C up/down · Shift fast · F surf · H tweaks'
-			: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · H tweaks';
+		if ( mode === 'fly' ) this.fly.euler.setFromQuaternion( this.camera.quaternion );
+		else if ( mode === 'walk' ) this.walkCam.snap( this.walker );
+		else this.chase.snap( this.surfer );
+		this.hudHint = {
+			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
+			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
+			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · H tweaks'
+		}[ mode ];
+
+	}
+
+	// step off the board onto a pier end; the board stays parked in the slip
+	dock( slip ) {
+
+		this.surfer.reset( slip.sea.x, slip.sea.z, slip.yaw );
+		this.walker.place( slip.deck.x, slip.deck.z, slip.yaw + Math.PI );
+		this.setMode( 'walk' );
+
+	}
+
+	launch( slip ) {
+
+		this.surfer.reset( slip.sea.x, slip.sea.z, slip.yaw );
+		this.setMode( 'surf' );
 
 	}
 
@@ -127,25 +160,41 @@ export class App {
 		const dt = Math.max( 0, Math.min( this.clock.getDelta(), 0.1 ) );
 		const input = this.input;
 
-		if ( input.wasPressed( 'KeyF' ) ) this.setMode( this.mode === 'fly' ? 'surf' : 'fly' );
+		if ( input.wasPressed( 'KeyF' ) ) this.setMode( this.mode === 'fly' ? this.returnMode : 'fly' );
 
 		this.time += dt;
 		this.sea.update( this.time, this.camera );
 
-		const surf = this.mode === 'surf';
-		const key = ( c ) => surf && input.down( c ) ? 1 : 0;
-		if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
-		this.surfer.update( dt, {
-			steer: key( 'KeyD' ) - key( 'KeyA' ),
-			throttle: key( 'KeyW' ) - key( 'KeyS' ),
-			jump: surf && input.wasPressed( 'Space' )
-		} );
-		this.port.collide( this.surfer );
+		const surf = this.mode === 'surf', walk = this.mode === 'walk';
+		const key = ( c ) => input.down( c ) ? 1 : 0;
+
+		// board: ridden, or parked in its slip while on foot
+		if ( this.onFoot ) this.surfer.park( dt );
+		else {
+
+			if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
+			this.surfer.update( dt, surf ? {
+				steer: key( 'KeyD' ) - key( 'KeyA' ),
+				throttle: key( 'KeyW' ) - key( 'KeyS' ),
+				jump: input.wasPressed( 'Space' )
+			} : {} );
+			this.port.collide( this.surfer );
+
+		}
+
+		this.interact( input );
+		if ( walk && ! this.dialogue.active ) {
+
+			this.walker.update( dt, { forward: key( 'KeyW' ) - key( 'KeyS' ), right: key( 'KeyD' ) - key( 'KeyA' ), run: input.down( 'ShiftLeft' ) }, this.walkCam.yaw );
+
+		}
+		this.npcs.update( dt, this.onFoot ? this.walker.position : null );
 		this.port.update( dt, WIND.angle );
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
 
 		if ( surf ) this.chase.update( dt, this.surfer );
+		else if ( walk ) this.walkCam.update( dt, this.walker );
 		else this.fly.update( dt );
 
 		this.giant.update( this.time, this.camera );
@@ -156,6 +205,55 @@ export class App {
 		this.updateHud();
 		input.endFrame();
 		this.pipeline.render();
+
+	}
+
+	// E to dock, launch or talk (E / Space advance dialogue); shows the matching prompt
+	interact( input ) {
+
+		const e = input.wasPressed( 'KeyE' );
+		let prompt = '';
+		if ( this.dialogue.active ) {
+
+			if ( e || input.wasPressed( 'Space' ) ) this.dialogue.next();
+
+		} else if ( this.mode === 'surf' ) {
+
+			const s = this.surfer;
+			const slip = this.port.slips.find( ( k ) => Math.hypot( k.sea.x - s.position.x, k.sea.z - s.position.z ) < 16 );
+			if ( slip && s.grounded && s.speed < 10 ) {
+
+				prompt = 'E · step onto the dock';
+				if ( e ) this.dock( slip );
+
+			}
+
+		} else if ( this.mode === 'walk' ) {
+
+			const w = this.walker.position;
+			const npc = this.npcs.nearest( w );
+			const slip = this.port.slips.find( ( k ) => Math.hypot( k.deck.x - w.x, k.deck.z - w.z ) < 3 );
+			if ( npc ) {
+
+				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
+				if ( e ) this.dialogue.open( npc.name, npc.lines );
+
+			} else if ( slip ) {
+
+				prompt = 'E · launch the board';
+				if ( e ) this.launch( slip );
+
+			}
+
+		}
+		if ( this.dialogue.active ) prompt = '';
+		if ( prompt !== this.promptText ) {
+
+			this.promptText = prompt;
+			this.promptEl.textContent = prompt;
+			this.promptEl.style.opacity = prompt ? 1 : 0;
+
+		}
 
 	}
 
@@ -187,7 +285,7 @@ export class App {
 
 		const s = this.surfer, sail = s.sailState;
 		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
-		const text = `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
+		const text = this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}

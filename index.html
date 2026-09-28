@@ -8,11 +8,18 @@
 		html, body { margin: 0; height: 100%; background: #05030d; overflow: hidden; color: #f3e6c4; font: 14px/1.4 Georgia, serif; }
 		canvas { display: block; }
 		#hud { position: fixed; left: 12px; bottom: 10px; opacity: .75; pointer-events: none; text-shadow: 0 1px 2px #000; }
+		#prompt { position: fixed; left: 0; right: 0; bottom: 64px; text-align: center; font-size: 18px; color: #ffe2b0; text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity .2s; pointer-events: none; }
+		#dialogue { position: fixed; left: 50%; bottom: 40px; width: min(640px, calc(100% - 32px)); transform: translate(-50%, 20px); padding: 14px 20px 16px; background: rgba(20, 10, 30, .82); border: 1px solid #b8863b; border-radius: 6px; box-shadow: 0 0 24px rgba(255, 140, 60, .25); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; box-sizing: border-box; }
+		#dialogue.open { opacity: 1; transform: translate(-50%, 0); }
+		#dialogue .name { color: #ffb86a; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
+		#dialogue .text { font-size: 17px; line-height: 1.45; color: #f3e6c4; }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
 	</style>
 </head>
 <body>
 	<div id="toast"></div>
+	<div id="prompt"></div>
+	<div id="dialogue"><div class="name"></div><div class="text"></div></div>
 	<div id="hud">Click to look &middot; WASD move &middot; Space/C up/down &middot; Shift fast &middot; Esc release &middot; H tweaks</div>
 	<script type="module" src="/src/main.js"></script>
 </body>

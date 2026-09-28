@@ -6,7 +6,7 @@ import { HARBOR } from './WorldLayout.js';
 // Brasslight Harbor (working name), procedural first pass (milestone 4): a floating moonlet ringed by a
 // boardwalk, four piers on pilings, lanterns, shacks, banners and a lighthouse with a sweeping beam.
 // Also owns simple 2D colliders (circle + pier rectangles) that stop the board.
-const DECK_Y = 2.0; // deck height above the calm harbour surface
+export const DECK_Y = 2.0; // deck height above the calm harbour surface
 const RING_IN = 42;
 const RING_OUT = 54;
 const PIER_LEN = 52;
@@ -30,6 +30,18 @@ export class Port {
 		this.buildShacks( mats );
 		this.buildLighthouse( mats );
 		this.buildBanners( mats );
+
+		// slips at the pier ends: where you dock (deck spot) and launch (sea spot just past the end)
+		this.slips = PIER_ANGLES.map( ( a ) => {
+
+			const end = RING_OUT + PIER_LEN - 2;
+			return {
+				deck: { x: HARBOR.x + Math.cos( a ) * ( end - 1.5 ), z: HARBOR.z + Math.sin( a ) * ( end - 1.5 ) },
+				sea: { x: HARBOR.x + Math.cos( a ) * ( end + 5 ), z: HARBOR.z + Math.sin( a ) * ( end + 5 ) },
+				yaw: Math.atan2( Math.cos( a ), Math.sin( a ) ) // facing out along the pier
+			};
+
+		} );
 
 		// colliders in world space
 		this.circle = { x: HARBOR.x, z: HARBOR.z, r: RING_OUT };
@@ -183,6 +195,7 @@ export class Port {
 
 		// a handful of shacks on the boardwalk, doors facing out
 		const angles = [ 0.45, 1.2, 2.05, 2.75, 3.6, 4.3, 5.05, 5.8 ];
+		this.shacks = []; // world-space footprints (for walking) and door spots (for NPCs)
 		for ( const a of angles ) {
 
 			const w = 5 + ( a * 7 % 3 ), h = 3.5 + ( a * 5 % 2 );
@@ -200,6 +213,12 @@ export class Port {
 			shack.position.set( Math.cos( a ) * r, DECK_Y + 0.5, Math.sin( a ) * r );
 			shack.rotation.y = Math.PI / 2 - a;
 			this.group.add( shack );
+			this.shacks.push( {
+				x: HARBOR.x + Math.cos( a ) * r, z: HARBOR.z + Math.sin( a ) * r,
+				ax: Math.cos( a ), az: Math.sin( a ), halfDepth: 2.5, halfWidth: w / 2, // box footprint, depth along the radius
+				door: { x: HARBOR.x + Math.cos( a ) * ( r + 3.6 ), z: HARBOR.z + Math.sin( a ) * ( r + 3.6 ) },
+				facing: Math.atan2( Math.cos( a ), Math.sin( a ) ) // yaw pointing outward
+			} );
 
 		}
 
@@ -249,6 +268,13 @@ export class Port {
 
 	}
 
+	// solid meshes the walk camera shouldn't pass through (not the beam or the glow bits)
+	get cameraObstacles() {
+
+		return this.group.children.filter( ( o ) => o !== this.beam && ! o.isLight && ! o.isInstancedMesh );
+
+	}
+
 	update( dt, windAngle ) {
 
 		this.time += dt;
@@ -258,6 +284,37 @@ export class Port {
 			b.rotation.y = - windAngle * Math.PI / 180 + Math.sin( this.time * 3 + i ) * 0.15;
 
 		} );
+
+	}
+
+	// Can someone stand here? The boardwalk ring or a pier, not inside a shack.
+	walkable( x, z ) {
+
+		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
+		let ok = r > RING_IN + 0.6 && r < RING_OUT - 0.4;
+		if ( ! ok ) {
+
+			for ( const p of this.rects ) {
+
+				const dx = x - p.x, dz = z - p.z;
+				const along = dx * p.ax + dz * p.az, across = - dx * p.az + dz * p.ax;
+				if ( Math.abs( along ) < p.halfLen - 0.3 && Math.abs( across ) < p.halfW - 0.4 ) ok = true;
+
+			}
+
+		}
+		if ( ok ) {
+
+			for ( const s of this.shacks ) {
+
+				const dx = x - s.x, dz = z - s.z;
+				const depth = dx * s.ax + dz * s.az, width = - dx * s.az + dz * s.ax;
+				if ( Math.abs( depth ) < s.halfDepth + 0.3 && Math.abs( width ) < s.halfWidth + 0.3 ) return false;
+
+			}
+
+		}
+		return ok;
 
 	}
 

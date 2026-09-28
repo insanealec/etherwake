@@ -64,6 +64,23 @@ export class Surfer {
 
 	}
 
+	// Parked at a slip while the rider is on foot: bob on the surface, no rider, sail furled.
+	park( dt ) {
+
+		this.time += dt;
+		this.velocity.set( 0, 0, 0 );
+		this.grounded = true;
+		this.position.y = this.sea.heightAt( this.position.x, this.position.z );
+		this.updateModel( dt, {} );
+
+	}
+
+	set riderVisible( v ) {
+
+		this.rider.visible = v;
+
+	}
+
 	get speed() {
 
 		return Math.hypot( this.velocity.x, this.velocity.z );

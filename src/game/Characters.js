@@ -1,0 +1,28 @@
+// Port characters: who stands where and what they say. Names are placeholders (see docs/concept.md).
+// shack: index into the port's shacks (0 is just north of the east pier, 7 just south of it).
+
+export const CHARACTERS = [
+	{
+		id: 'dockmaster', name: 'Dockmaster', shack: 0, coat: 0x3b2a55, hat: 0x1c1420,
+		lines: [
+			'Welcome to Brasslight Harbor, surfer. Tie up anywhere that isn\'t on fire.',
+			'The job board\'s still drying. Courier runs and races soon: the flare season\'s nearly on us.',
+			'Want real air? Ride against the swell, not with it. Every rookie learns that the hard way.'
+		]
+	},
+	{
+		id: 'shipwright', name: 'Shipwright', shack: 7, coat: 0x6b4a2a, hat: null,
+		lines: [
+			'Mind the rail. You\'ll scuff the brass.',
+			'That board of yours pulls a hair to the left. Bring me coin and I\'ll true it: faster, grippier, whatever you can afford.',
+			'Shop\'s not open yet. Still sorting my spanners. Come back soon.'
+		]
+	},
+	{
+		id: 'tea', name: 'Tea-seller', shack: 1, coat: 0x2f5a52, hat: 0x7a2a35,
+		lines: [
+			'Nebula tea? Steeped in etherium. Tastes like a sunrise, mostly.',
+			'Those motes out there? Old starlight, settling. My gran used to say you could read your luck in them.'
+		]
+	}
+];

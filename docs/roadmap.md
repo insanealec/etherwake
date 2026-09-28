@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 4, the port (slice 1 done). Milestones 2 and 3 done (the optional sun drift is
+- **Current milestone:** 4, the port (slices 1 and 2 done: port, walking, NPCs, dialogue). Milestones 2 and 3 done (the optional sun drift is
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -16,6 +16,15 @@
   downwind, a lighthouse with a sweeping additive beam. 2D colliders (ring circle + pier rectangles)
   push the board out and bounce it slightly; skipped when the board is above deck height, so you can
   jump a pier. The surfer spawns off the east pier's end.
+- **Milestone 4 slice 2 (2026-09-28):** on foot. Modes are now surf / walk / fly (F returns to the mode you
+  left). In surf, E near a pier-end slip (slow, grounded) docks: the board parks in the slip
+  (`Surfer.park`, rider hidden) and you walk (`src/player/Walker.js`, camera-relative WASD, Shift runs,
+  kept on deck by `port.walkable()` with per-axis sliding; `src/player/Figure.js` builds the primitive
+  people). `src/core/WalkCamera.js` orbits (mouse or arrow keys) and raycasts `port.cameraObstacles`
+  so it doesn't sit inside shacks. `src/game/Characters.js` (data: name, shack, colours, lines) and
+  `src/world/Npcs.js` (figures at shack doors, turn to face you): Dockmaster, Shipwright, Tea-seller
+  near the east pier. `src/ui/Dialogue.js` + `#dialogue` box: E talks, E/Space advances. `#prompt`
+  shows the available action. E at a pier end launches the board.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -79,10 +88,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Continue **milestone 4**: walk-on-foot mode on the dock (dismount at a pier end, a simple walker with
-deck collision, E to interact), vendor NPCs (primitive figures at the shacks) and a dialogue box UI.
-Openly licensed models (Kenney, Quaternius, Poly Haven) can replace the procedural pieces later: they need
-the user's OK to download, and each goes in `CREDITS.md`.
+Milestone 4 is functionally there. Ask the user to try docking, walking and talking. Possible polish: a
+proper board-rack / slip visual, motes hidden over the deck, footstep bob for the camera, more NPC
+variety. Then **milestone 5 (the loop)**: job board (courier and race), stardust collectibles, trick
+scoring, the shipwright's upgrade shop (credits modify the `BOARD` / `WIND` numbers via `game/Gear.js`
+tiers), HUD, and saving to localStorage.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
