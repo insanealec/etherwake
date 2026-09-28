@@ -18,6 +18,9 @@ import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
 import { Dialogue } from './ui/Dialogue.js';
+import { Save } from './game/Save.js';
+import { REWARDS, trickPayout } from './game/Rewards.js';
+import { Stardust } from './world/Stardust.js';
 import { SPAWN } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
@@ -31,6 +34,7 @@ export class App {
 
 		this.container = container;
 		this.params = new URLSearchParams( location.search );
+		this.save = new Save();
 
 		this.renderer = new THREE.WebGPURenderer( { antialias: true } );
 		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
@@ -83,6 +87,10 @@ export class App {
 		this.hud = document.getElementById( 'hud' );
 		this.toastEl = document.getElementById( 'toast' );
 		this.promptEl = document.getElementById( 'prompt' );
+		this.stardust = new Stardust( this.scene, this.sea );
+		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
+		this.creditsEl = document.getElementById( 'credits' );
+		this.save.onChange( ( d ) => this.showCredits( d.credits ) );
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
@@ -193,6 +201,7 @@ export class App {
 		}
 		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
+		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
 
@@ -272,13 +281,37 @@ export class App {
 		this.chase.land( r.impact );
 		this.spray.burst( this.surfer, Math.min( 40, 6 + r.impact * 3 ) | 0 );
 		if ( r.kind === 'wipeout' ) return this.toast( 'Wipeout!' );
+		const pay = trickPayout( r );
+		this.save.addCredits( pay );
+		if ( r.spin >= 180 ) this.save.stat( 'tricks', ( n ) => n + 1 );
+		this.save.stat( 'bestAir', ( b ) => Math.max( b, +r.air.toFixed( 2 ) ) );
 		const parts = [];
 		if ( r.spin >= 180 ) parts.push( String( r.spin ) );
 		if ( r.revert ) parts.push( 'revert' );
 		if ( r.air >= 1.8 ) parts.push( `${ r.air.toFixed( 1 ) }s air` );
 		if ( r.kind === 'sketchy' ) parts.push( 'sketchy' );
 		else if ( parts.length ) parts.push( 'clean' );
+		if ( pay > 0 ) parts.push( `+${ pay } ✦` );
 		if ( parts.length ) this.toast( parts.join( ' · ' ) );
+
+	}
+
+	onStardust( pos, trailDone ) {
+
+		const pay = REWARDS.stardust + ( trailDone ? REWARDS.trailBonus : 0 );
+		this.save.addCredits( pay );
+		this.save.stat( 'stardust', ( n ) => n + 1 );
+		this.spray.burst( { position: pos, velocity: this.surfer.velocity }, 6 );
+		if ( trailDone ) this.toast( `Trail complete · +${ pay } ✦` );
+
+	}
+
+	showCredits( n ) {
+
+		this.creditsEl.textContent = `✦ ${ n }`;
+		this.creditsEl.classList.remove( 'pop' );
+		void this.creditsEl.offsetWidth; // restart the pop animation
+		this.creditsEl.classList.add( 'pop' );
 
 	}
 

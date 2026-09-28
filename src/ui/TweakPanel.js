@@ -70,6 +70,8 @@ export class TweakPanel {
 		wind.add( WIND, 'angle', - 180, 180, 1 ).name( 'angle (0 = +x)' );
 		wind.add( WIND, 'strength', 0, 3, 0.01 );
 
+		gui.add( { reset: () => app.save.reset() }, 'reset' ).name( 'reset saved progress' );
+
 		const linear = () => Object.fromEntries( Object.entries( PALETTE ).map( ( [ k, c ] ) => [ k, c.toArray().map( ( x ) => + x.toFixed( 3 ) ) ] ) );
 		gui.add( { log: () => console.log( JSON.stringify( { SEA, WAVES, FOG, BOARD, WIND, PALETTE: linear() }, null, '\t' ) ) }, 'log' ).name( 'log values to console' );
 

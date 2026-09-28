@@ -13,10 +13,14 @@
 		#dialogue.open { opacity: 1; transform: translate(-50%, 0); }
 		#dialogue .name { color: #ffb86a; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
 		#dialogue .text { font-size: 17px; line-height: 1.45; color: #f3e6c4; }
+		#credits { position: fixed; right: 16px; top: 12px; font-size: 22px; color: #ffd08a; text-shadow: 0 0 10px #ff7a3a, 0 1px 2px #000; pointer-events: none; }
+		#credits.pop { animation: pop .35s ease-out; }
+		@keyframes pop { 0% { transform: scale( 1.25 ); } 100% { transform: scale( 1 ); } }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
 	</style>
 </head>
 <body>
+	<div id="credits"></div>
 	<div id="toast"></div>
 	<div id="prompt"></div>
 	<div id="dialogue"><div class="name"></div><div class="text"></div></div>

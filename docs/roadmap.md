@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 4, the port (slices 1 and 2 done: port, walking, NPCs, dialogue). Milestones 2 and 3 done (the optional sun drift is
+- **Current milestone:** 5, the loop (slice 1 done: credits, stardust, trick payouts, save). Milestone 4 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -32,6 +32,14 @@
   board". Pier-end slips are gone. Talk from the board: each character stands at the ring's outer edge
   with a glowing mooring buoy on the water in front (`Npcs.nearestMooring`, 7 m); E talks without
   docking, and the board is held still during dialogue. Walking remains optional.
+- **Milestone 5 slice 1 (2026-09-28):** credits (✦, HUD top-right with a pop) saved in localStorage
+  (`src/game/Save.js`, key `etherwake.save.v1`, every access wrapped; stats: stardust, tricks, bestAir;
+  "reset saved progress" in the tweak panel). `src/game/Rewards.js`: `REWARDS` payouts and
+  `trickPayout( landing )` (per 180 of spin, revert, air past 1.5 s; sketchy pays half; wipeouts nothing),
+  plus the `STARDUST` table. `src/world/Stardust.js`: 48 seeded trails of 10 motes (220 to 1100 m from
+  the harbour, mostly along the crests; 35% arc 7 m high over a crest so you have to jump), instanced
+  spinning gold octahedra riding the swell, a faint light pillar per trail for finding it from afar
+  (fades up close), trails respawn after 90 s. +1 per mote, +5 per whole trail.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -95,10 +103,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Ask the user to try the new docking and mooring flow. Then **milestone 5 (the loop)**: job board (courier
-and race; the dockmaster could hand jobs out at the mooring), stardust collectibles, trick scoring for
-credits, the shipwright's upgrade shop (credits modify the `BOARD` / `WIND` numbers via `game/Gear.js`
-tiers), a HUD, and saving to localStorage.
+Milestone 5 slice 2: **courier jobs** from the dockmaster (talk at the mooring: accept a job, a parcel
+buoy appears somewhere out at sea with a pillar, pick it up by riding through, bring it back to the
+dockmaster's mooring before a generous timer; pays credits scaled by distance). Then slice 3: the
+**shipwright's shop** (upgrade tiers in `game/Gear.js` that modify `BOARD` / `WIND` numbers; buy at the
+shipwright's mooring; saved). Then slice 4: **races** (gates against the clock, later a rival).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
