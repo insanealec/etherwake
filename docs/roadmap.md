@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 3, sky (slice 1 done). Milestone 2 done: the user play-tested it ("feels good to
+- **Current milestone:** 3, sky (slices 1 and 2 done). Milestone 2 done: the user play-tested it ("feels good to
   run against the waves and jump and spin").
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
@@ -17,8 +17,12 @@
   `src/sea/Shells.js`, three additive patchy gas shells 0.6 / 1.2 / 1.9 m above the swell (you ride
   through them), drifting at different speeds for parallax, faded near the camera and past ~500 m, on a
   256² grid (`sea.buildGeometry( segments )`). `?noShells` disables; the tweak panel's Gas folder toggles
-  shells and motes and sets shell strength live. Whole scene ~2.3 ms at 1080p. **Waiting on the user's
-  verdict** on shells (keep, tune, or drop).
+  shells and motes and sets shell strength live. Whole scene ~2.3 ms at 1080p. The user likes the shells.
+- **Milestone 3 slice 2 (2026-09-28):** a galaxy band in `Starfield` (great circle `GALAXY_NORMAL`,
+  clumpy violet glow, dark dust lanes, denser stars); `src/sky/Moon.js`, a small icy moon at infinity
+  with Worley craters and a crisp terminator; `src/post/SunFlare.js`, soft tinted ghost discs along the
+  sun-to-centre line in the post pipeline (sun projected in JS each frame, fades toward the screen edge).
+  Exposure checked by eye in several views and left at 1.0.
 - **Milestone 3 so far (2026-09-28):** sun disc, corona and warm glow in the backdrop (`Starfield`'s `sun`
   option, same direction as the sea's `uSunDir`). `src/sky/GasGiant.js`: a sphere at a fixed direction
   and 9 km from the camera (follows it, so no parallax; `fog: false`), banded TSL clouds with
@@ -64,9 +68,12 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's verdict on the gas shells (compare with the Gas folder toggles). Then resume
-**milestone 3**: exposure and tone-mapping tuning with bloom on, a subtle sun flare, a better star field (a
-faint milky band), maybe a small second moon. Then milestone 4 (the port).
+Milestone 3 is nearly done: optionally a slow time-of-light shift (sun colour and height drifting), then
+mark it done and start **milestone 4 (the port)**: a floating dock-town anchored to a small moon, modular
+dock pieces, lanterns, sails and banners (openly licensed models recorded in `CREDITS.md`, or procedural),
+walk-on-foot mode on the dock, vendor NPCs and a dialogue box.
+The user was playing with the wind at strength 2.3 / angle -6 in the tweak panel: ask whether to make
+stronger wind the default.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

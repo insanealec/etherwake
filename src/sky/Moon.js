@@ -5,7 +5,7 @@ import { Fn, vec3, dot, smoothstep, mix, normalLocal, normalWorld, mx_fractal_no
 // Worley-noise craters and a crisp terminator lit by the sun.
 const DIR = new THREE.Vector3( 0.15, 0.48, 0.86 ).normalize();
 const DISTANCE = 8000;
-const RADIUS = 150; // ~2 degrees across
+const RADIUS = 220; // ~3 degrees across
 
 export class Moon {
 
