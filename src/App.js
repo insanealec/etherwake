@@ -5,6 +5,7 @@ import { Starfield } from './sky/Starfield.js';
 import { Etherium } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
 import { Motes, MOTE_LAYERS } from './sea/Motes.js';
+import { Shells } from './sea/Shells.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
@@ -51,9 +52,10 @@ export class App {
 		this.sea = new Etherium( this.scene );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
 		this.giant = new GasGiant( this.scene, this.sea.uSunDir );
+		if ( ! this.params.has( 'noShells' ) ) this.shells = new Shells( this.scene, this.sea );
 		this.motes = this.params.has( 'noMotes' ) ? [] : Object.values( MOTE_LAYERS ).map( ( layer ) => new Motes( this.scene, this.sea, layer ) );
-		this.buildPipeline();
 		this.tweaks = new TweakPanel( this );
+		this.buildPipeline();
 		this.buildLights();
 
 		this.surfer = new Surfer( this.scene, this.sea );
@@ -136,6 +138,7 @@ export class App {
 
 		this.giant.update( this.time, this.camera );
 		for ( const m of this.motes ) m.update( this.camera, this.surfer );
+		if ( this.shells ) this.shells.update();
 		this.updateHud();
 		input.endFrame();
 		this.pipeline.render();

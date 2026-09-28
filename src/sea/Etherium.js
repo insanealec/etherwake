@@ -126,9 +126,10 @@ export class Etherium {
 
 	}
 
-	buildGeometry() {
+	// segments: grid resolution (the gas shells use a coarser grid)
+	buildGeometry( segments = SEGMENTS ) {
 
-		const geo = new THREE.PlaneGeometry( 2, 2, SEGMENTS, SEGMENTS );
+		const geo = new THREE.PlaneGeometry( 2, 2, segments, segments );
 		geo.rotateX( - Math.PI / 2 );
 		const pos = geo.attributes.position;
 		const remap = ( u ) => HALF * u * ( CENTER + ( 1 - CENTER ) * u * u );
@@ -136,7 +137,7 @@ export class Etherium {
 		// world-fixed lattice, so waves don't swim across the sparse outer grid as it follows the camera
 		const step = ( u ) => {
 
-			const ds = HALF * ( CENTER + 3 * ( 1 - CENTER ) * u * u ) * 2 / SEGMENTS;
+			const ds = HALF * ( CENTER + 3 * ( 1 - CENTER ) * u * u ) * 2 / segments;
 			return SNAP * Math.pow( 2, Math.max( 0, Math.floor( Math.log2( ds / SNAP ) + 1e-6 ) ) );
 
 		};

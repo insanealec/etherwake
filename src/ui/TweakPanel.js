@@ -47,6 +47,17 @@ export class TweakPanel {
 		fog.add( FOG, 'above', 0, 0.005, 0.0001 ).name( 'density above' );
 		fog.add( FOG, 'below', 0, 0.1, 0.001 ).name( 'density below' );
 
+		// nebula gas layers: toggle to compare, and shell brightness
+		const gas = gui.addFolder( 'Gas' ).close();
+		if ( app.shells ) {
+
+			gas.add( app.shells, 'visible' ).name( 'shells' );
+			gas.add( app.shells.uStrength, 'value', 0, 1, 0.01 ).name( 'shell strength' );
+
+		}
+		const motes = { visible: true };
+		if ( app.motes.length ) gas.add( motes, 'visible' ).name( 'motes' ).onChange( ( v ) => app.motes.forEach( ( m ) => m.mesh.visible = v ) );
+
 		const board = gui.addFolder( 'Board' ).close();
 		const ranges = {
 			gravity: [ 2, 30 ], airGravity: [ 2, 30 ], slope: [ 0, 3 ], slopeUp: [ 0, 3 ], thrust: [ 0, 15 ], pump: [ 0, 8 ], brake: [ 0, 5 ], drag: [ 0, 0.5 ], dragQuad: [ 0, 0.05 ],

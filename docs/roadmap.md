@@ -13,8 +13,12 @@
   on a world-anchored lattice around the camera, riding `etheriumWaves`, rising and fading, shoved aside by
   the board. Two layers in `MOTE_LAYERS` (wide 256² at 1.4 m out to 150 m; near 128² at 0.5 m out to
   30 m). `?noMotes` disables. Cost: whole scene ~1.8 ms at 1080p 4x MSAA via `__ew.benchmark()`
-  (offscreen render timed to queue drain; the pane's fps and timestamp queries are unreliable). Slice 3
-  (stacked translucent shells for depth) is **waiting on the user's look**.
+  (offscreen render timed to queue drain; the pane's fps and timestamp queries are unreliable). Slice 3:
+  `src/sea/Shells.js`, three additive patchy gas shells 0.6 / 1.2 / 1.9 m above the swell (you ride
+  through them), drifting at different speeds for parallax, faded near the camera and past ~500 m, on a
+  256² grid (`sea.buildGeometry( segments )`). `?noShells` disables; the tweak panel's Gas folder toggles
+  shells and motes and sets shell strength live. Whole scene ~2.3 ms at 1080p. **Waiting on the user's
+  verdict** on shells (keep, tune, or drop).
 - **Milestone 3 so far (2026-09-28):** sun disc, corona and warm glow in the backdrop (`Starfield`'s `sun`
   option, same direction as the sea's `uSunDir`). `src/sky/GasGiant.js`: a sphere at a fixed direction
   and 9 km from the camera (follows it, so no parallax; `fog: false`), banded TSL clouds with
@@ -60,10 +64,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Show the user the nebula sea (slices 1 and 2). If they want more depth, do slice 3: two or three faint
-translucent copies of the sea surface a little below it. Then resume **milestone 3**: exposure and
-tone-mapping tuning with bloom on, a subtle sun flare, a better star field (a faint milky band), maybe a
-small second moon. Then milestone 4 (the port).
+Get the user's verdict on the gas shells (compare with the Gas folder toggles). Then resume
+**milestone 3**: exposure and tone-mapping tuning with bloom on, a subtle sun flare, a better star field (a
+faint milky band), maybe a small second moon. Then milestone 4 (the port).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
