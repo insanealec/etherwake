@@ -14,6 +14,10 @@ const _f = new THREE.Vector3();
 const _r = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
+const _v = new THREE.Vector3();
+const MAST_TOP = new THREE.Vector3( 0, 2.72, 0.35 );
+const DEG = Math.PI / 180;
+const wrap = ( a ) => Math.atan2( Math.sin( a ), Math.cos( a ) );
 
 // The solar surfer: board physics against the etherium's heightAt / normalAt.
 // Horizontal velocity is integrated freely; while riding, the height follows the
@@ -31,12 +35,19 @@ export class Surfer {
 		this.steer = 0; // smoothed -1..1, for lean
 		this.crouch = 0;
 		this.up = new THREE.Vector3( 0, 1, 0 ); // smoothed board up
-		this.onLand = null; // callback( impactSpeed )
+		this.onLand = null; // callback( { kind: 'clean' | 'sketchy' | 'wipeout', impact, spin, air, revert } )
+		this.airSpin = 0; // signed yaw turned since leaving the surface (rad)
+		this.airTime = 0;
+		this.wipeout = 0; // seconds of tumble left
+		this.visualYaw = 0; // smoothed yaw for the model (so a revert swings round instead of snapping)
+		this.time = 0;
 		this.sailState = {}; // sailPower() result for the current heading
 		this.boomSide = 1;
 
 		this.object = this.buildModel();
 		scene.add( this.object );
+		this.pennant = this.buildPennant();
+		scene.add( this.pennant );
 		this.reset( 0, 0, Math.PI / 2 );
 
 	}
@@ -45,8 +56,9 @@ export class Surfer {
 
 		this.position.set( x, this.sea.heightAt( x, z ), z );
 		this.velocity.set( Math.sin( yaw ) * 8, 0, Math.cos( yaw ) * 8 );
-		this.yaw = yaw;
+		this.yaw = this.visualYaw = yaw;
 		this.grounded = true;
+		this.wipeout = 0;
 
 	}
 
@@ -66,6 +78,14 @@ export class Surfer {
 	update( dt, controls ) {
 
 		if ( ! ( dt > 0 ) ) return;
+		this.time += dt;
+		if ( this.wipeout > 0 ) {
+
+			controls = {};
+			this.wipeout -= dt;
+			if ( this.wipeout <= 0 ) this.recover();
+
+		}
 		const n = Math.max( 1, Math.ceil( dt / STEP - 1e-6 ) );
 		const h = dt / n;
 		const t0 = this.sea.time - dt;
@@ -107,8 +127,8 @@ export class Surfer {
 			const keep = Math.exp( - B.grip * h );
 			latX *= keep; latZ *= keep;
 
-			// drag (plus brake)
-			const lin = B.drag + ( throttle < 0 ? B.brake * - throttle : 0 );
+			// drag (plus brake, plus a lot while tumbling)
+			const lin = B.drag + ( throttle < 0 ? B.brake * - throttle : 0 ) + ( this.wipeout > 0 ? 1.5 : 0 );
 			const fwd2 = fwd * Math.max( 0, 1 - ( lin + B.dragQuad * Math.abs( fwd ) ) * h );
 			v.x = fx * fwd2 + latX;
 			v.z = fz * fwd2 + latZ;
@@ -117,13 +137,16 @@ export class Surfer {
 
 				// crest pop: jumping off a rising face adds part of the surface's lift
 				v.y = Math.min( B.maxLaunch, v.y + B.jump + B.pop * Math.max( 0, v.y ) );
-				this.grounded = false;
+				this.takeOff();
 
 			}
 
 		} else {
 
-			this.yaw -= steer * B.airTurn * h;
+			const turn = steer * B.airTurn * h;
+			this.yaw -= turn;
+			this.airSpin += turn;
+			this.airTime += h;
 
 		}
 
@@ -139,9 +162,8 @@ export class Surfer {
 
 			if ( ! this.grounded ) {
 
-				const impact = Math.max( 0, - v.y );
 				this.grounded = true;
-				if ( this.onLand ) this.onLand( impact );
+				this.land( Math.max( 0, - v.y ) );
 
 			}
 			p.y = surface;
@@ -153,11 +175,59 @@ export class Surfer {
 			p.y = surface;
 			v.y = liftSpeed( surface, yPrev, h );
 
-		} else {
+		} else if ( this.grounded ) {
 
-			this.grounded = false;
+			this.takeOff();
 
 		}
+
+	}
+
+	takeOff() {
+
+		this.grounded = false;
+		this.airSpin = 0;
+		this.airTime = 0;
+
+	}
+
+	// Grade the landing by how far the heading is from the direction of travel. Landing
+	// backwards counts as a revert (the rider swings round to face forward).
+	land( impact ) {
+
+		const B = BOARD, v = this.velocity, speed = this.speed;
+		let off = 0;
+		if ( speed > 3 ) off = Math.acos( Math.max( - 1, Math.min( 1, ( v.x * Math.sin( this.yaw ) + v.z * Math.cos( this.yaw ) ) / speed ) ) ) / DEG;
+		const revert = off > 90;
+		if ( revert ) off = 180 - off;
+
+		const result = { impact, spin: Math.round( Math.abs( this.airSpin ) / Math.PI ) * 180, air: this.airTime, revert };
+		if ( off > B.wipeoutAngle ) {
+
+			result.kind = 'wipeout';
+			this.wipeout = B.wipeoutTime;
+
+		} else {
+
+			if ( revert ) this.yaw += Math.PI;
+			result.kind = off > B.cleanAngle ? 'sketchy' : 'clean';
+			if ( result.kind === 'sketchy' ) {
+
+				v.x *= B.sketchyKeep;
+				v.z *= B.sketchyKeep;
+
+			}
+
+		}
+		if ( this.onLand ) this.onLand( result );
+
+	}
+
+	// back on the board after a wipeout, facing the way we're drifting
+	recover() {
+
+		this.wipeout = 0;
+		if ( this.speed > 1 ) this.yaw = this.visualYaw = Math.atan2( this.velocity.x, this.velocity.z );
 
 	}
 
@@ -231,14 +301,17 @@ export class Surfer {
 		const target = this.grounded ? this.sea.normalAt( this.position.x, this.position.z, this.sea.time, _n ) : WORLD_UP;
 		this.up.lerp( target, this.grounded ? k : 1 - Math.exp( - 2 * dt ) ).normalize();
 
-		this.forward( _f );
+		this.visualYaw += wrap( this.yaw - this.visualYaw ) * ( 1 - Math.exp( - 14 * dt ) );
+		_f.set( Math.sin( this.visualYaw ), 0, Math.cos( this.visualYaw ) );
 		_f.addScaledVector( this.up, - _f.dot( this.up ) ).normalize();
 		_r.crossVectors( this.up, _f );
 		_m.makeBasis( _r, this.up, _f );
 		this.object.quaternion.setFromRotationMatrix( _m );
 		// lean into the carve
 		const lean = this.steer * Math.min( 1, this.speed / 12 ) * 0.45;
-		this.object.quaternion.multiply( _q.setFromAxisAngle( _f.set( 0, 0, 1 ), lean ) );
+		// wipeout: the board rolls onto its side and the rider topples
+		const tumble = this.wipeout > 0 ? Math.min( 1, ( BOARD.wipeoutTime - this.wipeout ) / 0.3 ) : 0;
+		this.object.quaternion.multiply( _q.setFromAxisAngle( _f.set( 0, 0, 1 ), lean + tumble * 1.3 ) );
 		this.object.position.copy( this.position );
 
 		this.rider.scale.y = 1 - this.crouch * 0.2;
@@ -249,7 +322,26 @@ export class Surfer {
 		if ( Math.abs( across ) > 0.15 ) this.boomSide = Math.sign( across );
 		const boom = - this.boomSide * Math.max( 0.25, ( Math.PI - st.theta ) / 2 );
 		this.sail.rotation.y += ( Math.PI / 2 + boom - this.sail.rotation.y ) * k;
-		this.rider.rotation.z = lean * 0.3;
+		this.rider.rotation.z = lean * 0.3 + tumble * 1.2;
+
+		// pennant at the mast top streams downwind (true wind) and flutters
+		this.object.updateMatrixWorld();
+		this.pennant.position.copy( _v.copy( MAST_TOP ) ).applyMatrix4( this.object.matrixWorld );
+		const flutter = Math.sin( this.time * 11 ) * 0.12 + Math.sin( this.time * 17.3 ) * 0.06;
+		this.pennant.rotation.set( 0, - WIND.angle * DEG + flutter, Math.sin( this.time * 7 ) * 0.1 );
+		this.pennant.visible = this.wipeout <= 0;
+
+	}
+
+	buildPennant() {
+
+		const shape = new THREE.Shape();
+		shape.moveTo( 0, - 0.09 );
+		shape.lineTo( 0.75, 0 );
+		shape.lineTo( 0, 0.09 );
+		shape.lineTo( 0, - 0.09 );
+		const mat = new THREE.MeshStandardNodeMaterial( { color: 0xd8405a, roughness: 0.8, side: THREE.DoubleSide, emissive: 0x401018 } );
+		return new THREE.Mesh( new THREE.ShapeGeometry( shape ), mat );
 
 	}
 

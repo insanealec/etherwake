@@ -17,6 +17,10 @@ export const BOARD = {
 	jump: 6.5, // upward kick from Space (m/s), added to the surface's own lift
 	pop: 0.6, // extra fraction of the surface's upward speed added when jumping off a rising face
 	maxLaunch: 15, // cap on upward speed after a jump (m/s): ~3.3 s of air, ~12 m high
-	airTurn: 3.0, // spin rate in the air (rad/s)
-	liftOff: 0.15 // gap above the surface (m) before the board counts as airborne
+	airTurn: 4.5, // spin rate in the air (rad/s): a 360 takes ~1.4 s
+	liftOff: 0.15, // gap above the surface (m) before the board counts as airborne
+	cleanAngle: 30, // landing: heading within this many degrees of travel (either stance) is clean
+	wipeoutAngle: 65, // beyond this it's a wipeout; in between is sketchy
+	sketchyKeep: 0.75, // fraction of speed kept after a sketchy landing
+	wipeoutTime: 1.6 // seconds tumbling before you're back on the board
 };

@@ -51,9 +51,10 @@ export class App {
 		this.surfer = new Surfer( this.scene, this.sea );
 		this.wake = new Wake( this.scene, this.sea );
 		this.chase = new ChaseCamera( this.camera, this.sea );
-		this.surfer.onLand = ( impact ) => this.chase.land( impact );
+		this.surfer.onLand = ( r ) => this.onLand( r );
 		this.chase.snap( this.surfer );
 		this.hud = document.getElementById( 'hud' );
+		this.toastEl = document.getElementById( 'toast' );
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
@@ -111,6 +112,29 @@ export class App {
 		this.updateHud();
 		input.endFrame();
 		this.renderer.render( this.scene, this.camera );
+
+	}
+
+	onLand( r ) {
+
+		this.chase.land( r.impact );
+		if ( r.kind === 'wipeout' ) return this.toast( 'Wipeout!' );
+		const parts = [];
+		if ( r.spin >= 180 ) parts.push( String( r.spin ) );
+		if ( r.revert ) parts.push( 'revert' );
+		if ( r.air >= 1.8 ) parts.push( `${ r.air.toFixed( 1 ) }s air` );
+		if ( r.kind === 'sketchy' ) parts.push( 'sketchy' );
+		else if ( parts.length ) parts.push( 'clean' );
+		if ( parts.length ) this.toast( parts.join( ' · ' ) );
+
+	}
+
+	toast( text ) {
+
+		this.toastEl.textContent = text;
+		this.toastEl.style.opacity = 1;
+		clearTimeout( this.toastTimer );
+		this.toastTimer = setTimeout( () => this.toastEl.style.opacity = 0, 1600 );
 
 	}
 

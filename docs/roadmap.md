@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 2, solar surfer (slice 2 done: wind, crest pop, wake).
+- **Current milestone:** 2, solar surfer (slice 4 done: landings, spins, wipeouts, pennant).
 - **Milestone 2 so far (2026-09-27):** `src/player/Surfer.js` rides `sea.heightAt`/`normalAt` at 120 Hz
   substeps: slope pull (normal's horizontal part), W thrust, S brake, grip on sideways slip, linear +
   quadratic drag, speed-scaled carving, Space jump (plus the surface's own lift), air spin, and landing via
@@ -26,6 +26,13 @@
   pull (`slopeUp` 0.55 when climbing, `slope` 1.3 when descending), floatier `airGravity` 9, and
   `maxLaunch` 15 m/s. Timed jumps (auto-jump on a rising face): upwind into the swells ~3.9 s / 14 m,
   beam ~2.9 s, running ~2 s; untimed jumps ~1.4 s.
+  **Slice 4 (2026-09-28):** landing grades in `Surfer.land()`: heading vs travel within `cleanAngle` 30°
+  is clean, up to `wipeoutAngle` 65° is sketchy (keeps 75% speed), beyond is a wipeout (board rolls,
+  rider topples, heavy drag, back up after 1.6 s facing the drift). Landing backwards counts as a revert
+  (the model swings round via a smoothed `visualYaw`). Spin (`airSpin`) and airtime are tracked;
+  `airTurn` 4.5 rad/s so a 360 fits in ~1.4 s. `onLand( result )` drives a centred toast
+  ("360 · 2.6s air · clean", "180 · revert · clean", "Wipeout!"). A red pennant at the mast top streams
+  downwind as the in-world wind cue.
   **Testing:** with the pane hidden, drive frames with a fake clock:
   `t += 1000 / 60; __ew.frame( t )` in a loop (don't mix with live rAF timestamps).
 - **Milestone 1 summary (2026-09-27):** `src/sea/Waves.js` (the SEA/WAVES table, 6 Gerstner waves) drives
@@ -42,11 +49,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Continue **milestone 2** (the feel): get the user's impressions of the wind and wake, then tune. Remaining
-ideas: a wind cue in the world (streaks or a pennant on the mast) so you can read it without the HUD;
-spray particles off the rail when carving hard; landing quality (clean vs sideways landing bleeds speed,
-maybe a wobble); simple air tricks (spin count) as groundwork for scoring; a gentle wipeout and respawn if
-you land badly. Then call milestone 2 done and move on to milestone 3 (sky).
+Milestone 2 is close to done. Get the user's impressions of landings, spins and wipeouts. Remaining small
+polish if wanted: spray particles off the rail on hard carves; a pre-landing cue (e.g. the pennant or the
+board tint shows when you're lined up for a clean landing). Then call milestone 2 done and start
+**milestone 3 (sky)**: sun disc and glow, a banded gas giant with rings, a better starfield, bloom via
+`PostProcessing` + `BloomNode`, and tone-mapping and exposure tuning.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

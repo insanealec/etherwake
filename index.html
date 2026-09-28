@@ -8,9 +8,11 @@
 		html, body { margin: 0; height: 100%; background: #05030d; overflow: hidden; color: #f3e6c4; font: 14px/1.4 Georgia, serif; }
 		canvas { display: block; }
 		#hud { position: fixed; left: 12px; bottom: 10px; opacity: .75; pointer-events: none; text-shadow: 0 1px 2px #000; }
+		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
 	</style>
 </head>
 <body>
+	<div id="toast"></div>
 	<div id="hud">Click to look &middot; WASD move &middot; Space/C up/down &middot; Shift fast &middot; Esc release &middot; H tweaks</div>
 	<script type="module" src="/src/main.js"></script>
 </body>
