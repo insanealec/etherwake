@@ -5,6 +5,16 @@
 ## Status
 - **Current milestone:** 3, sky (slice 1 done). Milestone 2 done: the user play-tested it ("feels good to
   run against the waves and jump and spin").
+- **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
+  as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
+  gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
+  back-lit glow toward the sun, grazing-angle thickening, soft sun-facing shading so slopes stay readable).
+  Slice 2: `src/sea/Motes.js`, instanced `Sprite` motes whose positions come purely from `instanceIndex`
+  on a world-anchored lattice around the camera, riding `etheriumWaves`, rising and fading, shoved aside by
+  the board. Two layers in `MOTE_LAYERS` (wide 256² at 1.4 m out to 150 m; near 128² at 0.5 m out to
+  30 m). `?noMotes` disables. Cost: whole scene ~1.8 ms at 1080p 4x MSAA via `__ew.benchmark()`
+  (offscreen render timed to queue drain; the pane's fps and timestamp queries are unreliable). Slice 3
+  (stacked translucent shells for depth) is **waiting on the user's look**.
 - **Milestone 3 so far (2026-09-28):** sun disc, corona and warm glow in the backdrop (`Starfield`'s `sun`
   option, same direction as the sea's `uSunDir`). `src/sky/GasGiant.js`: a sphere at a fixed direction
   and 9 km from the camera (follows it, so no parallax; `fog: false`), banded TSL clouds with
@@ -50,10 +60,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Continue **milestone 3**: exposure and tone-mapping tuning (the sea's crests and wake now bloom, check it
-still reads at dusk); a subtle lens-flare-ish streak or ghosts for the sun; a better star field (a few
-bright named-looking stars, a faint milky band); maybe a second, smaller moon. Optionally a slow
-time-of-light shift. Then milestone 4 (the port).
+Show the user the nebula sea (slices 1 and 2). If they want more depth, do slice 3: two or three faint
+translucent copies of the sea surface a little below it. Then resume **milestone 3**: exposure and
+tone-mapping tuning with bloom on, a subtle sun flare, a better star field (a faint milky band), maybe a
+small second moon. Then milestone 4 (the port).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

@@ -4,6 +4,7 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
+import { Motes, MOTE_LAYERS } from './sea/Motes.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
@@ -50,6 +51,7 @@ export class App {
 		this.sea = new Etherium( this.scene );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
 		this.giant = new GasGiant( this.scene, this.sea.uSunDir );
+		this.motes = this.params.has( 'noMotes' ) ? [] : Object.values( MOTE_LAYERS ).map( ( layer ) => new Motes( this.scene, this.sea, layer ) );
 		this.buildPipeline();
 		this.tweaks = new TweakPanel( this );
 		this.buildLights();
@@ -133,6 +135,7 @@ export class App {
 		else this.fly.update( dt );
 
 		this.giant.update( this.time, this.camera );
+		for ( const m of this.motes ) m.update( this.camera, this.surfer );
 		this.updateHud();
 		input.endFrame();
 		this.pipeline.render();
@@ -169,6 +172,28 @@ export class App {
 		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
 		const text = `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
+
+	}
+
+	// Debug: GPU cost of the scene pass, rendered n times into an offscreen w x h target (no present,
+	// so no vsync), timed until the GPU queue drains. Returns ms per render. __ew.benchmark()
+	async benchmark( n = 30, w = 1920, h = 1080 ) {
+
+		const rt = new THREE.RenderTarget( w, h, { type: THREE.HalfFloatType, samples: 4 } );
+		const cam = this.camera.clone();
+		cam.aspect = w / h;
+		cam.updateProjectionMatrix();
+		const device = this.renderer.backend.device;
+		this.renderer.setRenderTarget( rt );
+		this.renderer.render( this.scene, cam );
+		await device.queue.onSubmittedWorkDone();
+		const t0 = performance.now();
+		for ( let i = 0; i < n; i ++ ) this.renderer.render( this.scene, cam );
+		await device.queue.onSubmittedWorkDone();
+		const ms = ( performance.now() - t0 ) / n;
+		this.renderer.setRenderTarget( null );
+		rt.dispose();
+		return ms;
 
 	}
 
