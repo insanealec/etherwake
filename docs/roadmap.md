@@ -3,8 +3,15 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 2, solar surfer: feature-complete, **waiting on the user's play-test** before
-  calling it done.
+- **Current milestone:** 3, sky (slice 1 done). Milestone 2 done: the user play-tested it ("feels good to
+  run against the waves and jump and spin").
+- **Milestone 3 so far (2026-09-28):** sun disc, corona and warm glow in the backdrop (`Starfield`'s `sun`
+  option, same direction as the sea's `uSunDir`). `src/sky/GasGiant.js`: a sphere at a fixed direction
+  and 9 km from the camera (follows it, so no parallax; `fog: false`), banded TSL clouds with
+  differential rotation and a storm, soft terminator, atmospheric rim; rings with noise bands, a Cassini
+  gap and the planet's shadow (ray-sphere test in the ring shader). Bloom via `THREE.RenderPipeline` +
+  `bloom()` from `three/addons/tsl/display/BloomNode.js` (0.55, 0.45, threshold 0.85); `?noBloom` skips
+  it. App now renders with `this.pipeline.render()`.
 - **Milestone 2 summary (2026-09-28):** `src/player/Surfer.js` rides `sea.heightAt`/`normalAt` at 120 Hz
   substeps; all numbers in `src/game/Gear.js` (`BOARD`, also in the tweak panel's Board folder).
   - Riding: asymmetric slope pull (`slope` 1.3 down a face, `slopeUp` 0.55 climbing, so momentum carries
@@ -43,9 +50,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-The user play-tests milestone 2. Fold in their feedback; once they're happy, mark milestone 2 done and
-start **milestone 3 (sky)**: sun disc and glow, a banded gas giant with rings, a better starfield, bloom
-via `PostProcessing` + `BloomNode`, and tone-mapping and exposure tuning.
+Continue **milestone 3**: exposure and tone-mapping tuning (the sea's crests and wake now bloom, check it
+still reads at dusk); a subtle lens-flare-ish streak or ghosts for the sun; a better star field (a few
+bright named-looking stars, a faint milky band); maybe a second, smaller moon. Optionally a slow
+time-of-light shift. Then milestone 4 (the port).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
@@ -80,7 +88,7 @@ The glowing sea you'll surf on.
   slopes), at 60 fps.
 - Later upgrade: an FFT cascade for detail plus big Gerstner swells for gameplay.
 
-### 2. Solar surfer (the core feel)
+### 2. Solar surfer (the core feel) ✅
 - `src/player/Surfer.js`: board physics against `Etherium.heightAt` and `normalAt`: gravity along the
   slope, drag, grip (lateral friction), sail thrust from the wind direction times the trim, jumping off
   crests, air control, and landing alignment.

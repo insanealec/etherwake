@@ -42,7 +42,7 @@ export class Wake {
 		// soft edges, broken up into foamy streaks by world-space noise
 		const across = sin( uv().x.mul( Math.PI ) );
 		const foam = smoothstep( - 0.2, 0.6, mx_noise_float( positionWorld.xz.mul( 0.9 ) ) );
-		mat.colorNode = vec3( 1.0, 0.42, 0.10 ).mul( attribute( 'fade', 'float' ) ).mul( across.pow( 2 ) ).mul( foam.mul( 0.8 ).add( 0.2 ) ).mul( 0.9 );
+		mat.colorNode = vec3( 1.0, 0.42, 0.10 ).mul( attribute( 'fade', 'float' ) ).mul( across.pow( 2 ) ).mul( foam.mul( 0.8 ).add( 0.2 ) ).mul( 0.6 );
 
 		this.mesh = new THREE.Mesh( geo, mat );
 		this.mesh.frustumCulled = false;

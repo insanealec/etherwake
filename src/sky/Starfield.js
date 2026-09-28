@@ -20,13 +20,15 @@ const starLayer = Fn( ( [ dir, scale, density ] ) => {
 
 } );
 
-// Procedural sky backdrop: three star layers over a faint two-tone nebula haze.
-// Placeholder for the full sky (sun, gas giant, rings) in milestone 3.
+// Procedural sky backdrop: three star layers over a faint two-tone nebula haze, the horizon band,
+// and the sun (a hot disc for bloom to catch, a tight corona and a wide warm glow).
+// The gas giant is a separate mesh (sky/GasGiant.js).
 export class Starfield {
 
 	// horizon: optional vec3 node (the sea's fog colour) for the horizon band and below-horizon fill
 	// underwater: optional 0/1 node; when 1 the whole backdrop becomes the (underwater) fog colour
-	constructor( scene, { horizon = vec3( 0.10, 0.02, 0.09 ), underwater = float( 0 ) } = {} ) {
+	// sun: optional normalized vec3 node, the direction toward the sun
+	constructor( scene, { horizon = vec3( 0.10, 0.02, 0.09 ), underwater = float( 0 ), sun = null } = {} ) {
 
 		scene.backgroundNode = Fn( () => {
 
@@ -41,7 +43,16 @@ export class Starfield {
 			const haze = mix( vec3( 0.10, 0.03, 0.16 ), vec3( 0.02, 0.07, 0.14 ), n2 ).mul( pow( max( n, 0.0 ), 2.5 ).mul( 1.6 ) );
 
 			const base = vec3( 0.006, 0.004, 0.014 );
-			const sky = base.add( haze ).add( stars ).add( horizon.mul( exp( dir.y.mul( - 14.0 ) ) ).mul( 0.8 ) );
+			const sky = base.add( haze ).add( stars ).add( horizon.mul( exp( dir.y.mul( - 14.0 ) ) ).mul( 0.8 ) ).toVar();
+			if ( sun ) {
+
+				const d = max( dot( dir, sun ), 0.0 );
+				const disc = smoothstep( 0.99955, 0.9997, d ).mul( 30.0 ); // ~1.5 degrees across
+				const corona = pow( d, 900.0 ).mul( 2.5 );
+				const glow = pow( d, 18.0 ).mul( 0.18 ).add( pow( d, 4.0 ).mul( 0.025 ) );
+				sky.addAssign( vec3( 1.0, 0.72, 0.42 ).mul( disc.add( corona ) ).add( vec3( 1.0, 0.35, 0.15 ).mul( glow ) ) );
+
+			}
 			// below the horizon we're looking at the (fogged) sea beyond the grid edge
 			const below = mix( horizon, horizon.mul( 0.3 ), smoothstep( 0.0, - 0.35, dir.y ) );
 			return mix( select( dir.y.lessThan( 0.0 ), below, sky ), horizon, underwater );

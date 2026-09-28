@@ -1,6 +1,9 @@
 import * as THREE from 'three/webgpu';
+import { pass } from 'three/tsl';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium } from './sea/Etherium.js';
+import { GasGiant } from './sky/GasGiant.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
@@ -45,7 +48,9 @@ export class App {
 		console.info( `[etherwake] renderer backend: ${ this.backend }` );
 
 		this.sea = new Etherium( this.scene );
-		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater } );
+		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
+		this.giant = new GasGiant( this.scene, this.sea.uSunDir );
+		this.buildPipeline();
 		this.tweaks = new TweakPanel( this );
 		this.buildLights();
 
@@ -60,6 +65,21 @@ export class App {
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
+
+	}
+
+	// Scene pass plus bloom (skip with ?noBloom). Tone mapping and sRGB happen in the pipeline output.
+	buildPipeline() {
+
+		this.pipeline = new THREE.RenderPipeline( this.renderer );
+		const color = pass( this.scene, this.camera ).getTextureNode( 'output' );
+		if ( this.params.has( 'noBloom' ) ) this.pipeline.outputNode = color;
+		else {
+
+			this.bloom = bloom( color, 0.55, 0.45, 0.85 );
+			this.pipeline.outputNode = color.add( this.bloom );
+
+		}
 
 	}
 
@@ -112,9 +132,10 @@ export class App {
 		if ( surf ) this.chase.update( dt, this.surfer );
 		else this.fly.update( dt );
 
+		this.giant.update( this.time, this.camera );
 		this.updateHud();
 		input.endFrame();
-		this.renderer.render( this.scene, this.camera );
+		this.pipeline.render();
 
 	}
 
