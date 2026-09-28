@@ -14,7 +14,7 @@ codebase when the docs answer the question, don't spawn subagents unless asked, 
 techniques that can be upgraded later.
 
 ## Commands
-- `npm run dev` starts the dev server on http://127.0.0.1:5190. Use `preview_start` with name
+- `npm run dev` starts the dev server on http://127.0.0.1:5190 (or `$PORT`, see `vite.config.js`). Use `preview_start` with name
   `etherwake` (in `.claude/launch.json`).
 - `npm run build` does a static build into `dist/`.
 
