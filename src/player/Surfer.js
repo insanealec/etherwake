@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { BOARD } from '../game/Gear.js';
+import { WIND, sailPower } from '../world/Wind.js';
 
 const STEP = 1 / 120; // physics substep (s)
 const WORLD_UP = new THREE.Vector3( 0, 1, 0 );
@@ -31,6 +32,8 @@ export class Surfer {
 		this.crouch = 0;
 		this.up = new THREE.Vector3( 0, 1, 0 ); // smoothed board up
 		this.onLand = null; // callback( impactSpeed )
+		this.sailState = {}; // sailPower() result for the current heading
+		this.boomSide = 1;
 
 		this.object = this.buildModel();
 		scene.add( this.object );
@@ -90,9 +93,11 @@ export class Surfer {
 			this.yaw -= steer * B.turnRate * Math.min( 1, 0.3 + speed / B.turnMinSpeed ) * h;
 			const fx = Math.sin( this.yaw ), fz = Math.cos( this.yaw );
 
-			// slope pull (the normal's horizontal part points downhill) and sail thrust
-			v.x += ( B.gravity * B.slope * _n.x + fx * B.thrust * Math.max( 0, throttle ) ) * h;
-			v.z += ( B.gravity * B.slope * _n.z + fz * B.thrust * Math.max( 0, throttle ) ) * h;
+			// slope pull (the normal's horizontal part points downhill) and sail thrust,
+			// scaled by the point of sail (fastest on a beam reach, nothing head to wind)
+			const push = B.thrust * sailPower( this.yaw, this.sailState ).efficiency * Math.max( 0, throttle );
+			v.x += ( B.gravity * B.slope * _n.x + fx * push ) * h;
+			v.z += ( B.gravity * B.slope * _n.z + fz * push ) * h;
 
 			// grip: bleed the sideways part of the velocity
 			const fwd = v.x * fx + v.z * fz;
@@ -108,7 +113,8 @@ export class Surfer {
 
 			if ( jump ) {
 
-				v.y += B.jump;
+				// crest pop: jumping off a rising face adds part of the surface's lift
+				v.y += B.jump + B.pop * Math.max( 0, v.y );
 				this.grounded = false;
 
 			}
@@ -234,6 +240,13 @@ export class Surfer {
 		this.object.position.copy( this.position );
 
 		this.rider.scale.y = 1 - this.crouch * 0.2;
+
+		// boom swings out to the downwind side: square when running, close in when reaching upwind
+		const st = sailPower( this.yaw, this.sailState );
+		const across = Math.cos( WIND.angle * Math.PI / 180 ) * Math.cos( this.yaw ) - Math.sin( WIND.angle * Math.PI / 180 ) * Math.sin( this.yaw );
+		if ( Math.abs( across ) > 0.15 ) this.boomSide = Math.sign( across );
+		const boom = - this.boomSide * Math.max( 0.25, ( Math.PI - st.theta ) / 2 );
+		this.sail.rotation.y += ( Math.PI / 2 + boom - this.sail.rotation.y ) * k;
 		this.rider.rotation.z = lean * 0.3;
 
 	}

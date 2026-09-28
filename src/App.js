@@ -5,6 +5,7 @@ import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
 import { Surfer } from './player/Surfer.js';
+import { Wake } from './player/Wake.js';
 import { Input } from './core/Input.js';
 
 // Top-level app: owns the renderer, scene, camera and the frame loop.
@@ -48,6 +49,7 @@ export class App {
 		this.buildLights();
 
 		this.surfer = new Surfer( this.scene, this.sea );
+		this.wake = new Wake( this.scene, this.sea );
 		this.chase = new ChaseCamera( this.camera, this.sea );
 		this.surfer.onLand = ( impact ) => this.chase.land( impact );
 		this.chase.snap( this.surfer );
@@ -77,8 +79,8 @@ export class App {
 		else this.chase.snap( this.surfer );
 		this.fly.enabled = mode === 'fly';
 		this.hudHint = mode === 'fly'
-			? 'FLY · Click to look · WASD move · Space/C up/down · Shift fast · F surf · H tweaks'
-			: 'SURF · A/D carve · W sail · S brake · Space jump · R reset · F fly cam · H tweaks';
+			? 'FLY · click to look · WASD · Space/C up/down · Shift fast · F surf · H tweaks'
+			: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · H tweaks';
 
 	}
 
@@ -101,6 +103,7 @@ export class App {
 			throttle: key( 'KeyW' ) - key( 'KeyS' ),
 			jump: surf && input.wasPressed( 'Space' )
 		} );
+		this.wake.update( dt, this.surfer );
 
 		if ( surf ) this.chase.update( dt, this.surfer );
 		else this.fly.update( dt );
@@ -113,7 +116,9 @@ export class App {
 
 	updateHud() {
 
-		const text = `${ this.hudHint }  ·  ${ this.surfer.speed.toFixed( 0 ) } m/s${ this.surfer.grounded ? '' : ' · air' }`;
+		const s = this.surfer, sail = s.sailState;
+		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
+		const text = `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}

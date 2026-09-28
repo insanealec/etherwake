@@ -1,6 +1,8 @@
 import GUI from 'lil-gui';
 import { SEA, WAVES } from '../sea/Waves.js';
 import { PALETTE, FOG } from '../sea/Etherium.js';
+import { BOARD } from '../game/Gear.js';
+import { WIND } from '../world/Wind.js';
 
 // Debug tweak panel (lil-gui). H toggles it; hidden by default, `?tweaks` opens it on load.
 // Edits the data tables in place; wave edits call sea.refresh() to re-upload uniforms.
@@ -45,8 +47,19 @@ export class TweakPanel {
 		fog.add( FOG, 'above', 0, 0.005, 0.0001 ).name( 'density above' );
 		fog.add( FOG, 'below', 0, 0.1, 0.001 ).name( 'density below' );
 
+		const board = gui.addFolder( 'Board' ).close();
+		const ranges = {
+			gravity: [ 2, 30 ], slope: [ 0, 3 ], thrust: [ 0, 15 ], brake: [ 0, 5 ], drag: [ 0, 0.5 ], dragQuad: [ 0, 0.05 ],
+			grip: [ 0, 20 ], turnRate: [ 0.2, 4 ], turnMinSpeed: [ 0, 20 ], jump: [ 0, 20 ], pop: [ 0, 3 ], airTurn: [ 0, 8 ], liftOff: [ 0, 1 ]
+		};
+		for ( const key of Object.keys( BOARD ) ) board.add( BOARD, key, ...( ranges[ key ] || [] ) );
+
+		const wind = gui.addFolder( 'Wind' ).close();
+		wind.add( WIND, 'angle', - 180, 180, 1 ).name( 'angle (0 = +x)' );
+		wind.add( WIND, 'strength', 0, 3, 0.01 );
+
 		const linear = () => Object.fromEntries( Object.entries( PALETTE ).map( ( [ k, c ] ) => [ k, c.toArray().map( ( x ) => + x.toFixed( 3 ) ) ] ) );
-		gui.add( { log: () => console.log( JSON.stringify( { SEA, WAVES, FOG, PALETTE: linear() }, null, '\t' ) ) }, 'log' ).name( 'log values to console' );
+		gui.add( { log: () => console.log( JSON.stringify( { SEA, WAVES, FOG, BOARD, WIND, PALETTE: linear() }, null, '\t' ) ) }, 'log' ).name( 'log values to console' );
 
 		gui.show( app.params.has( 'tweaks' ) );
 		window.addEventListener( 'keydown', ( e ) => {

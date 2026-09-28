@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 2, solar surfer (first slice done, needs hands-on tuning).
+- **Current milestone:** 2, solar surfer (slice 2 done: wind, crest pop, wake).
 - **Milestone 2 so far (2026-09-27):** `src/player/Surfer.js` rides `sea.heightAt`/`normalAt` at 120 Hz
   substeps: slope pull (normal's horizontal part), W thrust, S brake, grip on sideways slip, linear +
   quadratic drag, speed-scaled carving, Space jump (plus the surface's own lift), air spin, and landing via
@@ -14,6 +14,12 @@
   switches don't jump the sea. HUD shows the controls and speed. Sail cruise ~10.5 m/s riding straight
   downwind (the board catches the swell ahead, which moves ~11 m/s); natural crest launches are rare at
   these speeds (big swells are gentle), so air comes from a timed Space near a crest.
+  **Slice 2 (2026-09-28):** user says it's "pretty fun". Added the solar wind (`src/world/Wind.js`: `WIND`
+  table plus `sailPower( yaw )` polar curve: 60% running, 110% beam reach, 0 in irons; the boom swings to
+  the downwind side), crest pop (`BOARD.pop`: jumping off a rising face adds part of its lift; airtime
+  0.7 to 1.6 s depending on timing), slope pull 1.3, a glowing foamy wake ribbon (`src/player/Wake.js`,
+  re-draped on the moving surface each frame), point of sail and power in the HUD, and Board and Wind
+  folders in the tweak panel. Measured: ~11 m/s running, ~18.6 m/s on a beam reach (across the swells).
   **Testing:** with the pane hidden, drive frames with a fake clock:
   `t += 1000 / 60; __ew.frame( t )` in a loop (don't mix with live rAF timestamps).
 - **Milestone 1 summary (2026-09-27):** `src/sea/Waves.js` (the SEA/WAVES table, 6 Gerstner waves) drives
@@ -30,11 +36,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Continue **milestone 2** (the feel): get the user's hands-on impressions, then tune. Likely next steps: a
-`BOARD` folder in the tweak panel; add a wind direction plus sail trim (thrust = wind · heading × trim)
-instead of flat W thrust; a stronger "pumping" push on down-slopes and more slope pull so riding a face
-beats the sail; crest pop (bonus lift when jumping at the top of a rising face); a wake/spray trail so speed
-reads. The make-or-break question: does carving down a swell and launching off a crest feel good?
+Continue **milestone 2** (the feel): get the user's impressions of the wind and wake, then tune. Remaining
+ideas: a wind cue in the world (streaks or a pennant on the mast) so you can read it without the HUD;
+spray particles off the rail when carving hard; landing quality (clean vs sideways landing bleeds speed,
+maybe a wobble); simple air tricks (spin count) as groundwork for scoring; a gentle wipeout and respawn if
+you land badly. Then call milestone 2 done and move on to milestone 3 (sky).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

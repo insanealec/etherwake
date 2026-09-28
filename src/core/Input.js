@@ -21,7 +21,7 @@ export class Input {
 
 		element.addEventListener( 'click', () => {
 
-			if ( document.pointerLockElement !== element ) element.requestPointerLock?.();
+			if ( document.pointerLockElement !== element ) element.requestPointerLock?.()?.catch?.( () => {} ); // rejected in some embedded browsers
 
 		} );
 		document.addEventListener( 'mousemove', ( e ) => {
