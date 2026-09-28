@@ -48,6 +48,8 @@ export class Surfer {
 		scene.add( this.object );
 		this.pennant = this.buildPennant();
 		scene.add( this.pennant );
+		this.marker = this.buildMarker();
+		scene.add( this.marker );
 		this.reset( 0, 0, Math.PI / 2 );
 
 	}
@@ -195,11 +197,8 @@ export class Surfer {
 	// backwards counts as a revert (the rider swings round to face forward).
 	land( impact ) {
 
-		const B = BOARD, v = this.velocity, speed = this.speed;
-		let off = 0;
-		if ( speed > 3 ) off = Math.acos( Math.max( - 1, Math.min( 1, ( v.x * Math.sin( this.yaw ) + v.z * Math.cos( this.yaw ) ) / speed ) ) ) / DEG;
-		const revert = off > 90;
-		if ( revert ) off = 180 - off;
+		const B = BOARD, v = this.velocity;
+		const { off, revert } = this.alignment();
 
 		const result = { impact, spin: Math.round( Math.abs( this.airSpin ) / Math.PI ) * 180, air: this.airTime, revert };
 		if ( off > B.wipeoutAngle ) {
@@ -220,6 +219,18 @@ export class Surfer {
 
 		}
 		if ( this.onLand ) this.onLand( result );
+
+	}
+
+	// How far the heading is from the direction of travel, in degrees, measured to whichever
+	// stance is closer (revert: landing backwards).
+	alignment() {
+
+		const v = this.velocity, speed = this.speed;
+		let off = 0;
+		if ( speed > 3 ) off = Math.acos( Math.max( - 1, Math.min( 1, ( v.x * Math.sin( this.yaw ) + v.z * Math.cos( this.yaw ) ) / speed ) ) ) / DEG;
+		const revert = off > 90;
+		return { off: revert ? 180 - off : off, revert };
 
 	}
 
@@ -246,7 +257,9 @@ export class Surfer {
 		board.scale.set( 1, 1, 0.22 );
 		board.position.y = 0.08;
 		group.add( board );
-		const rim = new THREE.Mesh( new THREE.TorusGeometry( 0.3, 0.03, 6, 24 ), brass );
+		// the rim gets its own material so it can glow as the landing cue
+		this.rimMat = new THREE.MeshStandardNodeMaterial( { color: 0xb8863b, metalness: 0.85, roughness: 0.35 } );
+		const rim = new THREE.Mesh( new THREE.TorusGeometry( 0.3, 0.045, 6, 24 ), this.rimMat );
 		rim.rotation.x = Math.PI / 2;
 		rim.scale.set( 1, 3.4, 1 );
 		rim.position.y = 0.08;
@@ -324,12 +337,42 @@ export class Surfer {
 		this.sail.rotation.y += ( Math.PI / 2 + boom - this.sail.rotation.y ) * k;
 		this.rider.rotation.z = lean * 0.3 + tumble * 1.2;
 
+		// landing cue: in the air the rim and a ring on the sea below glow green when lined up,
+		// amber if sketchy, red for a wipeout; the ring is stretched along the heading
+		const cue = this.rimMat.emissive;
+		this.marker.visible = ! this.grounded && this.wipeout <= 0;
+		if ( this.grounded ) cue.setRGB( 0, 0, 0 );
+		else {
+
+			const { off } = this.alignment();
+			if ( off <= BOARD.cleanAngle ) cue.setRGB( 0.4, 3.2, 0.8 );
+			else if ( off <= BOARD.wipeoutAngle ) cue.setRGB( 3.2, 1.6, 0.2 );
+			else cue.setRGB( 3.6, 0.2, 0.2 );
+			const p = this.position, gap = p.y - this.sea.heightAt( p.x, p.z );
+			this.marker.position.set( p.x, p.y - gap + 0.08, p.z );
+			this.marker.rotation.set( 0, this.visualYaw, 0 );
+			this.marker.material.color.copy( cue ).multiplyScalar( 0.25 * Math.max( 0.3, 1 - gap / 20 ) );
+
+		}
+
 		// pennant at the mast top streams downwind (true wind) and flutters
 		this.object.updateMatrixWorld();
 		this.pennant.position.copy( _v.copy( MAST_TOP ) ).applyMatrix4( this.object.matrixWorld );
 		const flutter = Math.sin( this.time * 11 ) * 0.12 + Math.sin( this.time * 17.3 ) * 0.06;
 		this.pennant.rotation.set( 0, - WIND.angle * DEG + flutter, Math.sin( this.time * 7 ) * 0.1 );
 		this.pennant.visible = this.wipeout <= 0;
+
+	}
+
+	buildMarker() {
+
+		const geo = new THREE.RingGeometry( 0.8, 1.05, 40 );
+		geo.rotateX( - Math.PI / 2 );
+		geo.scale( 1, 1, 1.8 );
+		const mat = new THREE.MeshBasicNodeMaterial( { color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide } );
+		const marker = new THREE.Mesh( geo, mat );
+		marker.visible = false;
+		return marker;
 
 	}
 

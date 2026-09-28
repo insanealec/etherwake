@@ -3,38 +3,32 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 2, solar surfer (slice 4 done: landings, spins, wipeouts, pennant).
-- **Milestone 2 so far (2026-09-27):** `src/player/Surfer.js` rides `sea.heightAt`/`normalAt` at 120 Hz
-  substeps: slope pull (normal's horizontal part), W thrust, S brake, grip on sideways slip, linear +
-  quadratic drag, speed-scaled carving, Space jump (plus the surface's own lift), air spin, and landing via
-  a surface-following vertical speed (capped at 20 m/s). Numbers in `src/game/Gear.js` (`BOARD`). Primitive
-  board, mast, sail and rider with lean and crouch. `src/core/ChaseCamera.js` (spring-damped, follows travel
-  direction, dips on landing, stays above the sea). `F` toggles fly/surf, `?fly` starts in fly, `R` resets.
-  `Input.wasPressed` / `tap` for edge-triggered keys. `App.time` is a game clock (sum of capped dt) so tab
-  switches don't jump the sea. HUD shows the controls and speed. Sail cruise ~10.5 m/s riding straight
-  downwind (the board catches the swell ahead, which moves ~11 m/s); natural crest launches are rare at
-  these speeds (big swells are gentle), so air comes from a timed Space near a crest.
-  **Slice 2 (2026-09-28):** user says it's "pretty fun". Added the solar wind (`src/world/Wind.js`: `WIND`
-  table plus `sailPower( yaw )` polar curve: 60% running, 110% beam reach, 0 in irons; the boom swings to
-  the downwind side), crest pop (`BOARD.pop`: jumping off a rising face adds part of its lift; airtime
-  0.7 to 1.6 s depending on timing), slope pull 1.3, a glowing foamy wake ribbon (`src/player/Wake.js`,
-  re-draped on the moving surface each frame), point of sail and power in the HUD, and Board and Wind
-  folders in the tweak panel. Measured: ~11 m/s running, ~18.6 m/s on a beam reach (across the swells).
-  **Slice 3 (2026-09-28), from user feedback** ("can't catch up to jump off a wave; the pull stops you
-  going reverse over a wave"): faster board (running ~20 m/s now outruns the ~11 m/s swells, beam ~24),
-  a wind-free `pump` on W so upwind still crawls (~10 m/s), a narrower no-go zone (>150°), asymmetric slope
-  pull (`slopeUp` 0.55 when climbing, `slope` 1.3 when descending), floatier `airGravity` 9, and
-  `maxLaunch` 15 m/s. Timed jumps (auto-jump on a rising face): upwind into the swells ~3.9 s / 14 m,
-  beam ~2.9 s, running ~2 s; untimed jumps ~1.4 s.
-  **Slice 4 (2026-09-28):** landing grades in `Surfer.land()`: heading vs travel within `cleanAngle` 30°
-  is clean, up to `wipeoutAngle` 65° is sketchy (keeps 75% speed), beyond is a wipeout (board rolls,
-  rider topples, heavy drag, back up after 1.6 s facing the drift). Landing backwards counts as a revert
-  (the model swings round via a smoothed `visualYaw`). Spin (`airSpin`) and airtime are tracked;
-  `airTurn` 4.5 rad/s so a 360 fits in ~1.4 s. `onLand( result )` drives a centred toast
-  ("360 · 2.6s air · clean", "180 · revert · clean", "Wipeout!"). A red pennant at the mast top streams
-  downwind as the in-world wind cue.
-  **Testing:** with the pane hidden, drive frames with a fake clock:
-  `t += 1000 / 60; __ew.frame( t )` in a loop (don't mix with live rAF timestamps).
+- **Current milestone:** 2, solar surfer: feature-complete, **waiting on the user's play-test** before
+  calling it done.
+- **Milestone 2 summary (2026-09-28):** `src/player/Surfer.js` rides `sea.heightAt`/`normalAt` at 120 Hz
+  substeps; all numbers in `src/game/Gear.js` (`BOARD`, also in the tweak panel's Board folder).
+  - Riding: asymmetric slope pull (`slope` 1.3 down a face, `slopeUp` 0.55 climbing, so momentum carries
+    you to the lip), sail thrust from the solar wind (`src/world/Wind.js`: `WIND` table and the
+    `sailPower( yaw )` polar: ~80% running, ~110% beam reach, 0 within 30° of dead upwind) plus a
+    wind-free `pump`, grip on sideways slip, drag, speed-scaled carving. ~20 m/s running (outruns the
+    ~11 m/s swells), ~24 m/s on a beam reach, ~10 m/s crawling upwind.
+  - Air: Space jump plus crest pop (part of the rising face's lift), `maxLaunch` 15 m/s, `airGravity` 9.
+    Timed pops: upwind into the swells ~3.9 s / 14 m, beam ~2.9 s, running ~2 s; untimed ~1.4 s.
+    `airTurn` 4.5 rad/s (a 360 in ~1.4 s).
+  - Landing (`land()` / `alignment()`): heading vs travel within 30° clean, to 65° sketchy (keeps 75%
+    speed), beyond is a gentle wipeout (board rolls, rider topples, back up after 1.6 s). Landing
+    backwards is a revert (smoothed `visualYaw` swings the model round). Toasts: "360 · 2.6s air ·
+    clean", "180 · revert · clean", "Wipeout!".
+  - Cues and feedback: in the air a ring on the sea below you (stretched along your heading) and the
+    board's rim glow green / amber / red for clean / sketchy / wipeout. A red pennant at the mast top
+    streams downwind. Glowing wake ribbon (`Wake.js`), carve spray and landing bursts (`Spray.js`,
+    instanced droplets). HUD: controls, speed, point of sail and power.
+  - Camera and controls: `src/core/ChaseCamera.js` (spring-damped, follows travel, dips on landing, stays
+    above the sea). `F` toggles fly/surf (`?fly` starts in fly), `R` resets. `Input.wasPressed` / `tap`.
+    `App.time` is a game clock (sum of capped dt) so tab switches don't jump the sea.
+  - **Testing:** with the pane hidden, drive frames with a fake clock: `t += 1000 / 60; __ew.frame( t )`
+    in a loop (don't mix with live rAF timestamps). Wait on a rising face with
+    `s.grounded && s.velocity.y > 2` before `input.tap( 'Space' )` for a timed pop.
 - **Milestone 1 summary (2026-09-27):** `src/sea/Waves.js` (the SEA/WAVES table, 6 Gerstner waves) drives
   both `Etherium.heightAt`/`normalAt` (JS, fixed-point solve for the horizontal displacement) and
   `etheriumWaves` (TSL vertex displacement plus tangent, binormal and Jacobian). Camera-following nonlinear
@@ -49,11 +43,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 2 is close to done. Get the user's impressions of landings, spins and wipeouts. Remaining small
-polish if wanted: spray particles off the rail on hard carves; a pre-landing cue (e.g. the pennant or the
-board tint shows when you're lined up for a clean landing). Then call milestone 2 done and start
-**milestone 3 (sky)**: sun disc and glow, a banded gas giant with rings, a better starfield, bloom via
-`PostProcessing` + `BloomNode`, and tone-mapping and exposure tuning.
+The user play-tests milestone 2. Fold in their feedback; once they're happy, mark milestone 2 done and
+start **milestone 3 (sky)**: sun disc and glow, a banded gas giant with rings, a better starfield, bloom
+via `PostProcessing` + `BloomNode`, and tone-mapping and exposure tuning.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

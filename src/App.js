@@ -6,6 +6,7 @@ import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
+import { Spray } from './player/Spray.js';
 import { Input } from './core/Input.js';
 
 // Top-level app: owns the renderer, scene, camera and the frame loop.
@@ -50,6 +51,7 @@ export class App {
 
 		this.surfer = new Surfer( this.scene, this.sea );
 		this.wake = new Wake( this.scene, this.sea );
+		this.spray = new Spray( this.scene );
 		this.chase = new ChaseCamera( this.camera, this.sea );
 		this.surfer.onLand = ( r ) => this.onLand( r );
 		this.chase.snap( this.surfer );
@@ -105,6 +107,7 @@ export class App {
 			jump: surf && input.wasPressed( 'Space' )
 		} );
 		this.wake.update( dt, this.surfer );
+		this.spray.update( dt, this.surfer );
 
 		if ( surf ) this.chase.update( dt, this.surfer );
 		else this.fly.update( dt );
@@ -118,6 +121,7 @@ export class App {
 	onLand( r ) {
 
 		this.chase.land( r.impact );
+		this.spray.burst( this.surfer, Math.min( 40, 6 + r.impact * 3 ) | 0 );
 		if ( r.kind === 'wipeout' ) return this.toast( 'Wipeout!' );
 		const parts = [];
 		if ( r.spin >= 180 ) parts.push( String( r.spin ) );
