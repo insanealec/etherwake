@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 8, regions and polish (slice 1 done: the Flare Reach). Milestone 7 done.
+- **Current milestone:** 8, regions and polish (slices 1-2 done: the Flare Reach, the Ring Reach). Milestone 7 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -184,6 +184,19 @@
   PID 46888), and localStorage is per origin, so each new port meant an empty save. The preview is now
   pinned to 5191 (`.claude/launch.json`: `--port 5191 --strictPort`, autoPort off). Granted the user
   500 credits there to make up for lost progress.
+- **Milestone 8 slice 2 (2026-09-30): the Ring Reach.** `REGIONS.rings` (~4.2 km toward the gas giant,
+  radius 1300; tuning in `src/game/Rings.js`). `Regions` now handles several regions: each blends its
+  fog and sea tint in with distance, the strongest one sets `sea.regionFog`, `uRegionSea` and
+  `uRegionRecolor` (0 = multiply, 1 = repaint by brightness: the Rings use 0.85 to read as frost), and
+  the one you're inside sets the pay multiplier (`regions.multiplier`, used by `App.earn`); events are
+  `{ type, name }`. `src/world/Rings.js`: a 45 x 120 m glowing ice spire (fog-free landmark), 220 seeded
+  floating shards (instanced, icy rim-glow material) that stop the board, clear of the station and the
+  slalom gates; close shaves (within 2.5 m at > 12 m/s) pay 4, rime crystals 10 (respawn 120 s), all x2
+  inside. `Outpost` is now parameterized (`{ at, npc, colours }`): the Ember Outpost (trader) and
+  **Frostwater Station** (`FROSTWATER`, the **Ice pilot** `PILOT`: the shop plus R for the **Shard
+  Slalom**, an 11-gate course weaving round the spire; courses can have a region `center`; the harbour
+  marshal lists only harbour courses; `App.raceChoice`). Slalom medals from an autopilot (~117 s):
+  gold 108, silver 130.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -247,9 +260,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's play-test of the revised Flare Reach. Then more regions (the gas giant's rings with an ice
-slalom, the black hole rim with lensing), each with its own reason to visit; then a title screen,
-performance work and a GitHub Pages deploy.
+Get the user's play-test of the Ring Reach (shard density, close shaves, crystals, the slalom). Then the
+black hole rim (lensing post-pass, time-slow?), then a title screen, performance work and a GitHub Pages
+deploy.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

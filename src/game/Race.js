@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { uv, vec3, smoothstep, float, length, positionWorld, cameraPosition } from 'three/tsl';
 import { COURSES, RACE } from './Races.js';
-import { HARBOR } from '../world/WorldLayout.js';
+import { HARBOR, REGIONS } from '../world/WorldLayout.js';
 
 const DEG = Math.PI / 180;
 
@@ -45,7 +45,8 @@ export class Race {
 
 		this.course = COURSES.find( ( c ) => c.id === id );
 		this.group.clear();
-		const pts = this.course.gates.map( ( [ a, r ] ) => ( { x: HARBOR.x + Math.cos( a * DEG ) * r, z: HARBOR.z + Math.sin( a * DEG ) * r } ) );
+		const C = this.course.center ? REGIONS[ this.course.center ] : HARBOR;
+		const pts = this.course.gates.map( ( [ a, r ] ) => ( { x: C.x + Math.cos( a * DEG ) * r, z: C.z + Math.sin( a * DEG ) * r } ) );
 		this.gates = pts.map( ( p, i ) => {
 
 			// face along the course: from the previous gate to the next

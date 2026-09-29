@@ -18,7 +18,9 @@ import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
 import { Dialogue } from './ui/Dialogue.js';
-import { QUARTERMASTER, TRADER } from './game/Characters.js';
+import { QUARTERMASTER, TRADER, PILOT } from './game/Characters.js';
+import { RINGS } from './game/Rings.js';
+import { Rings } from './world/Rings.js';
 import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
@@ -33,7 +35,7 @@ import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
 import { UPGRADES, DEEDS, applyUpgrades, tierName } from './game/Gear.js';
-import { SPAWN } from './world/WorldLayout.js';
+import { SPAWN, OUTPOST, FROSTWATER, REGIONS } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
 import { Input } from './core/Input.js';
@@ -116,7 +118,20 @@ export class App {
 		this.galleon = new Galleon( this.scene, this.sea, this.save.data.galleon );
 		this.regions = new Regions( this.scene, this.sea );
 		this.regions.onSunstone = ( pos ) => this.onSunstone( pos );
-		this.outpost = new Outpost( this.scene, this.sea );
+		this.outposts = [
+			new Outpost( this.scene, this.sea, { at: OUTPOST, npc: TRADER } ),
+			new Outpost( this.scene, this.sea, { at: FROSTWATER, npc: PILOT, canvas: 0x2a5a7a, glow: [ 1.2, 2.6, 3.6 ], light: 0x60c0ff } )
+		];
+		// the Ring Reach's ice keeps clear of the Shard Slalom's gates
+		const slalom = COURSES.find( ( c ) => c.id === 'slalom' ), rc = REGIONS.rings;
+		this.rings = new Rings( this.scene, this.sea, slalom.gates.map( ( [ a, r ] ) => ( { x: rc.x + Math.cos( a * Math.PI / 180 ) * r, z: rc.z + Math.sin( a * Math.PI / 180 ) * r } ) ) );
+		this.rings.onShave = () => this.toast( `Close shave · +${ this.earn( RINGS.closeShave ) } ✦${ this.reachTag }` );
+		this.rings.onCrystal = ( pos ) => {
+
+			this.spray.burst( { position: pos, velocity: this.surfer.velocity }, 10 );
+			this.toast( `Rime crystal · +${ this.earn( RINGS.crystal ) } ✦${ this.reachTag }` );
+
+		};
 		this.shipCam = new ChaseCamera( this.camera, this.sea, { distance: 42, height: 16, lookAhead: 25, lookUp: 6, follow: 2.5, aim: 5, clearance: 4 } );
 		this.walkCam.obstacles = [ ...this.port.cameraObstacles, ...this.galleon.cameraObstacles ];
 		this.song = new WhaleSong( this.audio, this.leviathans );
@@ -246,7 +261,7 @@ export class App {
 			this.port.collide( this.surfer );
 			this.leviathans.collide( this.surfer );
 			this.galleon.collide( this.surfer );
-			this.outpost.collide( this.surfer );
+			for ( const o of this.outposts ) o.collide( this.surfer );
 			this.rideBowWave( dt );
 			this.rideFlare( dt );
 
@@ -262,7 +277,8 @@ export class App {
 		this.port.update( dt, WIND.angle );
 		this.leviathans.update( dt );
 		const helm = this.mode === 'helm' && ! this.dialogue.active;
-		this.outpost.update( dt );
+		for ( const o of this.outposts ) o.update( dt );
+		this.rings.update( dt, this.onFoot ? null : this.surfer );
 		this.galleon.update( dt, helm ? { steer: key( 'KeyD' ) - key( 'KeyA' ), sail: key( 'KeyW' ) - key( 'KeyS' ) } : null );
 		if ( this.mode === 'helm' && this.time > ( this.poseSavedAt || 0 ) + 5 ) this.saveShipPose();
 		if ( this.onFoot ) this.walker.sync(); // the deck may have moved under you
@@ -330,7 +346,8 @@ export class App {
 			// slow for the port; matching speed for the galleon (she may be under way)
 			const slow = s.speed < 10;
 			const matched = Math.hypot( s.velocity.x - this.galleon.velocity.x, s.velocity.z - this.galleon.velocity.z ) < 8;
-			const npc = ! slow ? null : this.outpost.nearMooring( s.position ) ? TRADER : this.npcs.nearestMooring( s.position );
+			const station = this.outposts.find( ( o ) => o.nearMooring( s.position ) );
+			const npc = ! slow ? null : station ? station.npc : this.npcs.nearestMooring( s.position );
 			const spot = npc ? null : ( slow && this.port.dockPoint( s.position.x, s.position.z ) ) || ( matched && this.galleon.dockPoint( s.position.x, s.position.z ) );
 			if ( npc ) {
 
@@ -405,7 +422,7 @@ export class App {
 	// Characters with something to offer build their conversation here; others just chat.
 	talkTo( npc ) {
 
-		if ( npc.id === 'shipwright' || npc.id === 'trader' ) return this.openShop( npc );
+		if ( npc.id === 'shipwright' || npc.id === 'trader' || npc.id === 'pilot' ) return this.openShop( npc );
 		if ( npc.id === 'marshal' ) return this.openRaces( npc );
 		if ( npc.id !== 'dockmaster' ) return this.dialogue.open( npc.name, npc.lines );
 		const c = this.courier;
@@ -455,6 +472,7 @@ export class App {
 			choices.push( { key: 'Digit5', label: `5 · ${ d.name } · ${ d.cost } ✦`, action: () => this.buyDeed( npc ) } );
 
 		}
+		if ( npc.id === 'pilot' ) choices.push( this.raceChoice( COURSES.find( ( c ) => c.id === 'slalom' ), 'KeyR', 'R' ) );
 		choices.push( { key: 'KeyQ', label: 'Q · that’s all' } );
 		this.dialogue.open( npc.name, [ line || npc.greeting || `What'll it be? You've got ${ this.save.credits } ✦ to spend.` ], choices );
 
@@ -522,25 +540,29 @@ export class App {
 			] );
 
 		}
-		const choices = COURSES.map( ( c, i ) => {
-
-			const best = this.save.data.races[ c.id ];
-			const bestText = best ? `best ${ formatTime( best ) }` : 'no time yet';
-			return {
-				key: `Digit${ i + 1 }`,
-				label: `${ i + 1 } · ${ c.name } · ${ c.gates.length } gates · ${ bestText } · gold ${ formatTime( c.gold ) }, silver ${ formatTime( c.silver ) }`,
-				action: () => {
-
-					if ( this.courier.state !== 'idle' ) this.courier.abandon();
-					this.race.start( c.id );
-					this.toast( `${ c.name } · ride through the first gate to start the clock` );
-
-				}
-			};
-
-		} );
+		// the marshal runs the harbour courses; region courses are run by their own station
+		const choices = COURSES.filter( ( c ) => ! c.center ).map( ( c, i ) => this.raceChoice( c, `Digit${ i + 1 }`, String( i + 1 ) ) );
 		choices.push( { key: 'KeyQ', label: 'Q · not now' } );
 		this.dialogue.open( npc.name, npc.lines, choices );
+
+	}
+
+	// a dialogue choice that starts race course `c`: its name, best time and medal times
+	raceChoice( c, key, label ) {
+
+		const best = this.save.data.races[ c.id ];
+		const bestText = best ? `best ${ formatTime( best ) }` : 'no time yet';
+		return {
+			key,
+			label: `${ label } · ${ c.name } · ${ c.gates.length } gates · ${ bestText } · gold ${ formatTime( c.gold ) }, silver ${ formatTime( c.silver ) }`,
+			action: () => {
+
+				if ( this.courier.state !== 'idle' ) this.courier.abandon();
+				this.race.start( c.id );
+				this.toast( `${ c.name } · ride through the first gate to start the clock` );
+
+			}
+		};
 
 	}
 
@@ -597,18 +619,18 @@ export class App {
 
 	}
 
-	onRegion( event ) {
+	onRegion( e ) {
 
-		const name = this.regions.flare.name;
-		if ( event === 'enter' ) {
+		if ( ! e ) return;
+		if ( e.type === 'enter' ) {
 
-			this.toast( `Entering ${ name }` );
-			this.save.data.foundFlareReach = true;
+			this.toast( `Entering ${ e.name }` );
+			this.save.data[ `found:${ e.name }` ] = true;
 			this.save.changed();
 
-		} else if ( event === 'leave' ) this.toast( `Leaving ${ name }` );
-		else if ( event === 'warning' ) this.toast( 'A flare is building…' );
-		else if ( event === 'launch' ) this.toast( 'Flare-front! Ride it away from the sun' );
+		} else if ( e.type === 'leave' ) this.toast( `Leaving ${ e.name }` );
+		else if ( e.type === 'warning' ) this.toast( 'A flare is building…' );
+		else if ( e.type === 'launch' ) this.toast( 'Flare-front! Ride it away from the sun' );
 
 	}
 
@@ -724,7 +746,7 @@ export class App {
 	// Credits from riding and tricks: doubled inside the Flare Reach. Returns what was paid.
 	earn( n ) {
 
-		const got = Math.round( n * ( this.regions.inReach ? REACH.multiplier : 1 ) );
+		const got = Math.round( n * this.regions.multiplier );
 		this.save.addCredits( got );
 		return got;
 
@@ -732,7 +754,7 @@ export class App {
 
 	get reachTag() {
 
-		return this.regions.inReach ? ` (×${ REACH.multiplier })` : '';
+		return this.regions.inReach ? ` (×${ this.regions.multiplier })` : '';
 
 	}
 
@@ -778,7 +800,7 @@ export class App {
 		const s = this.surfer, sail = s.sailState;
 		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
 		const G = this.galleon;
-		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ '▰'.repeat( Math.round( G.sail * 5 ) ) }${ '▱'.repeat( 5 - Math.round( G.sail * 5 ) ) } ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.solarOnly ? 'solar drive' : G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }${ this.regions.inReach ? `  ·  Flare Reach: credits ×${ REACH.multiplier }` : '' }`;
+		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ '▰'.repeat( Math.round( G.sail * 5 ) ) }${ '▱'.repeat( 5 - Math.round( G.sail * 5 ) ) } ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.solarOnly ? 'solar drive' : G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }${ this.regions.inReach ? `  ·  ${ this.regions.active.name.replace( 'the ', '' ) }: credits ×${ this.regions.multiplier }` : '' }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}

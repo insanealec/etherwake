@@ -285,9 +285,11 @@ export class Etherium {
 		this.uFogColor = uniform( PALETTE.fogAbove.clone() );
 		this.uFogDensity = uniform( FOG.above );
 		this.uUnderwater = uniform( 0 );
-		this.uFlareMix = uniform( 0 ); // region atmosphere: 0 outside the Flare Reach, 1 inside
+		this.uFlareMix = uniform( 0 ); // region atmosphere: 0 in the open sea, 1 inside a region
+		this.uRegionSea = uniform( new THREE.Color( ...FLARE_TINT.sea ) ); // the region's sea tint
+		this.uRegionRecolor = uniform( 0 ); // 0: multiply the sea's colours; 1: repaint them in the tint (keeping brightness)
 		this.regionMix = 0;
-		this.regionFog = new THREE.Color( ...FLARE_TINT.fog );
+		this.regionFog = new THREE.Color( ...FLARE_TINT.fog ); // set by world/Regions.js
 		this.uWaves = WAVES.map( () => ( { a: uniform( new THREE.Vector4() ), b: uniform( new THREE.Vector4() ) } ) );
 		this.refresh();
 
@@ -408,8 +410,10 @@ export class Etherium {
 			const puff = smoothstep( 0.65, 0.3, vJacobian ).mul( dens );
 			col.addAssign( hot.mul( puff ).mul( 0.7 ) );
 
-			// the Flare Reach runs hotter, and a flare-front's face glows like molten gold
-			col.assign( mix( col, col.mul( vec3( ...FLARE_TINT.sea ) ), this.uFlareMix ) );
+			// regions tint the sea (the Flare Reach runs hotter, the Ring Reach frostier);
+			// a flare-front's face glows like molten gold
+			const recolor = mix( col.mul( this.uRegionSea ), vec3( dot( col, vec3( 0.3, 0.55, 0.15 ) ) ).mul( this.uRegionSea ).mul( 1.6 ), this.uRegionRecolor );
+			col.assign( mix( col, recolor, this.uFlareMix ) );
 			col.addAssign( vec3( ...FLARE_TINT.glow ).mul( pow( flareHeight( P.xz ).div( FLARES.height ), 2 ) ).mul( 0.55 ) );
 
 			// back-lit gas: looking toward the sun, thin gas glows (a silver lining instead of a glint)

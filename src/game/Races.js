@@ -1,4 +1,4 @@
-// Race courses (milestone 5). Gates are given around the harbour as [ angle in degrees (0 = east,
+// Race courses (milestone 5). Gates are given around the harbour (or `center`: a region) as [ angle in degrees (0 = east,
 // 90 = south), distance in metres ]; the clock starts at the first gate. Swells run east, so
 // westward legs (around 180 degrees) ride into the swell. Every gate boosts you if you cross its centre.
 export const COURSES = [
@@ -11,6 +11,12 @@ export const COURSES = [
 		id: 'crest', name: 'Crest Run',
 		gates: [ [ 289, 95 ], [ 250, 250 ], [ 215, 450 ], [ 190, 650 ], [ 165, 820 ], [ 150, 650 ], [ 180, 450 ], [ 230, 250 ], [ 289, 110 ] ],
 		gold: 108, silver: 130 // autopilot ~117
+	},
+	{
+		// run by the ice pilot at Frostwater Station; gates weave around the spire, centred on the Ring Reach
+		id: 'slalom', name: 'Shard Slalom', center: 'rings',
+		gates: [ [ 0, 190 ], [ 36, 320 ], [ 72, 200 ], [ 108, 330 ], [ 144, 190 ], [ 180, 320 ], [ 216, 200 ], [ 252, 330 ], [ 288, 190 ], [ 324, 320 ], [ 350, 200 ] ],
+		gold: 108, silver: 130 // a straight-line autopilot hitting every centre does ~117
 	}
 ];
 

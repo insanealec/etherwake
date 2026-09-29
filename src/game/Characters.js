@@ -7,6 +7,12 @@ export const TRADER = {
 	greeting: 'Made it out to the Reach, did you? Everything the shipwright sells, I sell, and closer to the flares. What\'ll it be?'
 };
 
+// at Frostwater Station, in the Ring Reach
+export const PILOT = {
+	id: 'pilot', name: 'Ice pilot',
+	greeting: 'Cold enough for you? The shards are mean but they pay: brush past them fast and you\'ll feel it. I stock the shipwright\'s gear, and I run the Shard Slalom round the spire.'
+};
+
 // aboard the solar galleon
 export const QUARTERMASTER = {
 	name: 'Quartermaster',
