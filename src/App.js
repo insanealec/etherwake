@@ -22,6 +22,7 @@ import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Leviathans } from './world/Leviathans.js';
+import { Galleon } from './world/Galleon.js';
 import { Audio } from './audio/Audio.js';
 import { WhaleSong } from './audio/WhaleSong.js';
 import { Courier } from './game/Courier.js';
@@ -101,6 +102,7 @@ export class App {
 		this.promptEl = document.getElementById( 'prompt' );
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.leviathans = new Leviathans( this.scene, this.sea );
+		this.galleon = new Galleon( this.scene, this.sea );
 		this.song = new WhaleSong( this.audio, this.leviathans );
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
 		this.creditsEl = document.getElementById( 'credits' );
@@ -211,6 +213,7 @@ export class App {
 			} : {} );
 			this.port.collide( this.surfer );
 			this.leviathans.collide( this.surfer );
+			this.galleon.collide( this.surfer );
 			this.rideBowWave( dt );
 
 		}
@@ -224,9 +227,11 @@ export class App {
 		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
 		this.leviathans.update( dt );
+		this.galleon.update( dt );
 		this.song.update( dt, this.camera.position );
 		this.audio.update( this.camera );
 		this.spotPod();
+		this.spotGalleon();
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
 		this.onRace( this.race.update( dt, this.surfer ) );
@@ -468,6 +473,21 @@ export class App {
 
 			this.podSeenAt = this.time;
 			this.toast( 'A leviathan pod!' );
+
+		}
+
+	}
+
+	// Reaching the galleon for the first time (saved) gets a callout.
+	spotGalleon() {
+
+		if ( this.save.data.foundGalleon ) return;
+		const p = this.onFoot ? this.walker.position : this.surfer.position, g = this.galleon.group.position;
+		if ( Math.hypot( p.x - g.x, p.z - g.z ) < 120 ) {
+
+			this.save.data.foundGalleon = true;
+			this.save.changed();
+			this.toast( 'The solar galleon!' );
 
 		}
 

@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 6, leviathans (slices 1-3 done: pod, bow-wave riding, song). Milestone 5 done.
+- **Current milestone:** 7, the galleon (slice 1 done: the ship at anchor). Milestone 6 done (the user likes the ghostly song).
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -113,6 +113,16 @@
   ~0.04 at 500 m. Tweak panel: Audio folder (volume, mute). "A leviathan pod!" toast within 300 m (at
   most every 3 minutes). **Audio testing rule:** set `localStorage['etherwake.noAudio'] = '1'` in the test
   pane before anything; verify sound only with offline renders.
+- **Milestone 7 slice 1 (2026-09-29):** the user wanted the galleon further out than the whales; agreed:
+  `GALLEON` in `WorldLayout` at (-120, -1150), north of the harbour beyond the whale loop and the
+  stardust (a beam reach both ways). `src/world/Galleon.js`: procedural 36 m ship (`SHIP` table): a
+  lofted hull with a rising sheer, rails 0.9 m above the deck, plank lines and a brass rail stripe; a deck;
+  a stern castle with lit windows; a bowsprit; two masts with bellied gold solar sails (ribbed, glowing
+  in the middle); fan-shaped solar wings off each side; lanterns and masthead lights; a rose-gold beacon
+  beam (fades up close). Lights, sails and beam have `fog: false` so it reads from the harbour. It rides
+  the full swell at anchor (height, pitch and roll from sampling bow, stern and both sides, smoothed).
+  An oriented-box collider stops the board (skipped above deck height). "The solar galleon!" toast on
+  first approach (saved as `foundGalleon`).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -176,10 +186,12 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's ear on the whale song (volume, pitch, how often). Candidate polish: a breach splash ring
-and sound, an ambient sea bed (soft whoosh), board and sail sounds. Then **milestone 7 (the galleon)**:
-a small solar galleon to board, walk the deck, take the helm, sail between regions, launch the board
-from the deck.
+Milestone 7 slice 2: **board the galleon and walk its deck**. The walker needs a moving platform: keep
+the walker's position in ship-local coordinates and convert to world each frame (`Walker` currently uses
+`port.walkable()` and a fixed `DECK_Y`; generalise to a platform with `walkable( lx, lz )`, `toWorld()`,
+deck height). Dock from the board at the rail (like the port's `dockPoint`), launch from the rail. Maybe a
+ship's quartermaster NPC. Slice 3: take the helm and sail it (ship physics on the swell with the solar
+wind; the board rides along), and launch the board from the deck.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

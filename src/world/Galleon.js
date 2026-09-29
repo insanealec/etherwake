@@ -1,0 +1,309 @@
+import * as THREE from 'three/webgpu';
+import { Fn, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, positionWorld, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
+import { GALLEON } from './WorldLayout.js';
+
+// The solar galleon (milestone 7), procedural first pass in a Treasure Planet-like spirit (our own
+// design): a wooden hull with a rising sheer and brass trim, a stern castle with lit windows, a
+// bowsprit, two masts with glowing solar sails, fan-shaped solar wings off the sides, and lanterns.
+// It rides the full swell at anchor (pitch and roll from sampling the sea) and stops the board.
+export const SHIP = {
+	length: 36,
+	beam: 9,
+	depth: 6,
+	freeboard: 3.4, // deck height above the mean surface under the hull
+	response: 1.6 // how fast it follows the swell (1/s): heavier = slower
+};
+
+const HALF = SHIP.length / 2, W = SHIP.beam / 2;
+const smooth = ( a, b, x ) => {
+
+	const t = Math.max( 0, Math.min( 1, ( x - a ) / ( b - a ) ) );
+	return t * t * ( 3 - 2 * t );
+
+};
+// hull shape along t (0 = bow, 1 = stern)
+const halfWidth = ( t ) => W * Math.pow( smooth( 0, 0.4, t ), 0.55 ) * ( 1 - 0.22 * smooth( 0.75, 1, t ) ) + 0.05;
+const keel = ( t ) => SHIP.depth * ( 0.55 + 0.45 * smooth( 0, 0.35, t ) );
+const sheer = ( t ) => 1.6 * Math.pow( 1 - t, 4 ) + 1.2 * Math.pow( t, 6 ); // the deck line rises at the ends
+
+function hullGeometry() {
+
+	const N = 48, M = 18, pos = [], uvs = [], index = [];
+	for ( let i = 0; i <= N; i ++ ) {
+
+		const t = i / N, w = halfWidth( t ), d = keel( t ), s = sheer( t ), z = HALF - t * SHIP.length;
+		for ( let j = 0; j <= M; j ++ ) {
+
+			const f = j / M * Math.PI; // starboard rail -> keel -> port rail
+			const down = Math.pow( Math.sin( f ), 0.7 );
+			pos.push( Math.cos( f ) * w * ( 1 - 0.12 * down ), s + 1.3 - d * down, z ); // rail 0.9 m above the deck
+			uvs.push( t, 1 - down );
+
+		}
+
+	}
+	for ( let i = 0; i < N; i ++ ) {
+
+		for ( let j = 0; j < M; j ++ ) {
+
+			const a = i * ( M + 1 ) + j, b = a + M + 1;
+			index.push( a, a + 1, b, a + 1, b + 1, b );
+
+		}
+
+	}
+	const geo = new THREE.BufferGeometry();
+	geo.setAttribute( 'position', new THREE.Float32BufferAttribute( pos, 3 ) );
+	geo.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
+	geo.setIndex( index );
+	geo.computeVertexNormals();
+	return geo;
+
+}
+
+function deckGeometry() {
+
+	const pts = [];
+	for ( let i = 0; i <= 40; i ++ ) {
+
+		const t = i / 40;
+		pts.push( new THREE.Vector2( halfWidth( t ) * 0.94, - ( HALF - t * SHIP.length ) ) );
+
+	}
+	for ( let i = 40; i >= 0; i -- ) {
+
+		const t = i / 40;
+		pts.push( new THREE.Vector2( - halfWidth( t ) * 0.94, - ( HALF - t * SHIP.length ) ) );
+
+	}
+	const geo = new THREE.ShapeGeometry( new THREE.Shape( pts ) );
+	geo.rotateX( - Math.PI / 2 ); // shape y -> -z
+	return geo;
+
+}
+
+// A solar sail: a gently bellied rectangle, glowing gold with ribs, brighter toward the middle
+function sailGeometry( w, h, belly ) {
+
+	const geo = new THREE.PlaneGeometry( w, h, 12, 10 );
+	const p = geo.attributes.position;
+	for ( let i = 0; i < p.count; i ++ ) {
+
+		const u = p.getX( i ) / w * 2, v = p.getY( i ) / h * 2;
+		p.setZ( i, belly * ( 1 - u * u ) * ( 1 - 0.5 * v * v ) );
+
+	}
+	geo.computeVertexNormals();
+	return geo;
+
+}
+
+export class Galleon {
+
+	constructor( scene, sea ) {
+
+		this.sea = sea;
+		this.time = 0;
+		this.group = new THREE.Group();
+		this.group.rotation.order = 'YXZ';
+		this.group.position.set( GALLEON.x, 0, GALLEON.z );
+		this.group.rotation.y = GALLEON.yaw;
+		this.pitch = 0;
+		this.roll = 0;
+		this.lift = 0;
+		scene.add( this.group );
+		this.build();
+		this.float( 1, true );
+
+	}
+
+	build() {
+
+		const wood = new THREE.MeshStandardNodeMaterial( { roughness: 0.75, side: THREE.DoubleSide } );
+		// hull planks with a brass rail stripe along the top
+		wood.colorNode = Fn( () => {
+
+			const grain = mx_fractal_noise_float( positionWorld.mul( vec3( 0.4, 3.0, 0.4 ) ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
+			const planks = smoothstep( 0.0, 0.08, abs( fract( uv().y.mul( 9.0 ) ).sub( 0.5 ) ) );
+			const base = mix( vec3( 0.13, 0.05, 0.03 ), vec3( 0.3, 0.12, 0.06 ), grain ).mul( planks.mul( 0.35 ).add( 0.65 ) );
+			return mix( base, vec3( 0.75, 0.5, 0.2 ), smoothstep( 0.93, 0.96, uv().y ) );
+
+		} )();
+		const deckWood = new THREE.MeshStandardNodeMaterial( { roughness: 0.85 } );
+		deckWood.colorNode = Fn( () => {
+
+			const grain = mx_fractal_noise_float( positionWorld.mul( vec3( 2.0, 0.5, 0.25 ) ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
+			return mix( vec3( 0.24, 0.14, 0.07 ), vec3( 0.42, 0.26, 0.13 ), grain );
+
+		} )();
+		const brass = new THREE.MeshStandardNodeMaterial( { color: 0xb8863b, metalness: 0.85, roughness: 0.35 } );
+		// lights and sails ignore the fog, so the ship glows through the haze from the harbour
+		const glow = new THREE.MeshBasicNodeMaterial( { color: new THREE.Color( 4.0, 2.2, 0.8 ), fog: false } );
+		const windowGlow = new THREE.MeshBasicNodeMaterial( { color: new THREE.Color( 2.4, 1.2, 0.4 ) } );
+		// solar sails: saturated gold, glowing brightest in the middle, with brass ribs; see-through
+		const sail = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, transparent: true, depthWrite: false, opacity: 0.85, fog: false } );
+		sail.colorNode = Fn( () => {
+
+			const u = uv();
+			const ribs = smoothstep( 0.06, 0.0, abs( fract( u.x.mul( 6.0 ) ).sub( 0.5 ) ) );
+			const core = sin( u.x.mul( Math.PI ) ).mul( sin( u.y.mul( Math.PI ) ) );
+			const glow = vec3( 1.0, 0.3, 0.04 ).mul( core.mul( 1.6 ).add( 0.25 ) );
+			return mix( glow, vec3( 0.55, 0.32, 0.1 ), ribs.mul( 0.8 ) );
+
+		} )();
+
+		const g = this.group;
+		g.add( new THREE.Mesh( hullGeometry(), wood ) );
+		const deck = new THREE.Mesh( deckGeometry(), deckWood );
+		deck.position.y = 0.4;
+		g.add( deck );
+
+		// stern castle with a row of lit windows across the back
+		const castle = new THREE.Mesh( new THREE.BoxGeometry( 7.2, 2.8, 8 ), wood );
+		castle.position.set( 0, 1.8, - HALF + 5 );
+		g.add( castle );
+		for ( let i = 0; i < 4; i ++ ) {
+
+			const win = new THREE.Mesh( new THREE.PlaneGeometry( 0.9, 0.7 ), windowGlow );
+			win.position.set( - 2.4 + i * 1.6, 2.0, - HALF + 0.98 );
+			win.rotation.y = Math.PI;
+			g.add( win );
+
+		}
+
+		// bowsprit
+		const sprit = new THREE.Mesh( new THREE.CylinderGeometry( 0.12, 0.2, 9, 8 ), brass );
+		sprit.rotation.x = Math.PI / 2 - 0.35;
+		sprit.position.set( 0, 2.8, HALF + 2.5 );
+		g.add( sprit );
+
+		// masts and solar sails
+		for ( const [ z, h, sw, sh ] of [ [ 6, 20, 10, 8 ], [ - 3, 24, 12, 10 ] ] ) {
+
+			const mast = new THREE.Mesh( new THREE.CylinderGeometry( 0.22, 0.32, h, 10 ), wood );
+			mast.position.set( 0, h / 2, z );
+			g.add( mast );
+			const s = new THREE.Mesh( sailGeometry( sw, sh, 1.2 ), sail );
+			s.position.set( 0, h * 0.55, z + 0.4 );
+			g.add( s );
+			const top = new THREE.Mesh( new THREE.SphereGeometry( 0.45, 12, 8 ), glow );
+			top.position.set( 0, h + 0.4, z );
+			g.add( top );
+
+		}
+
+		// solar wings: fans off each side, tilted up
+		const fan = new THREE.Shape();
+		fan.moveTo( 0, 0 );
+		fan.lineTo( 11, 3 );
+		fan.quadraticCurveTo( 12.5, 0, 11, - 4 );
+		fan.lineTo( 0, - 1.5 );
+		fan.lineTo( 0, 0 );
+		for ( const side of [ 1, - 1 ] ) {
+
+			const wingGeo = new THREE.ShapeGeometry( fan, 12 );
+			const wuv = wingGeo.attributes.uv; // normalise the shape's raw coordinates to 0..1
+			for ( let i = 0; i < wuv.count; i ++ ) wuv.setXY( i, wuv.getX( i ) / 12.5, ( wuv.getY( i ) + 4 ) / 7 );
+			const wing = new THREE.Mesh( wingGeo, sail );
+			wing.rotation.set( - Math.PI / 2, 0, 0 );
+			wing.scale.x = side;
+			const pivot = new THREE.Group();
+			pivot.position.set( side * W * 0.9, 1.2, - 1 );
+			pivot.rotation.z = side * 0.35; // tilt up
+			pivot.add( wing );
+			g.add( pivot );
+
+		}
+
+		// stern and bow lanterns
+		for ( const [ x, y, z ] of [ [ 3.2, 3.9, - HALF + 1.5 ], [ - 3.2, 3.9, - HALF + 1.5 ], [ 0, 2.8, HALF - 0.5 ] ] ) {
+
+			const l = new THREE.Mesh( new THREE.SphereGeometry( 0.35, 10, 8 ), glow );
+			l.position.set( x, y, z );
+			g.add( l );
+
+		}
+		// a rose-gold beacon beam from the mainmast, fading upward and as you get close
+		const beamMat = new THREE.MeshBasicNodeMaterial( { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false } );
+		const near = smoothstep( 60, 300, length( positionWorld.xz.sub( cameraPosition.xz ) ) );
+		beamMat.colorNode = vec3( 0.55, 0.16, 0.2 ).mul( smoothstep( float( 1 ), float( 0 ), uv().y ) ).mul( near.mul( 0.85 ).add( 0.15 ) );
+		const beamGeo = new THREE.CylinderGeometry( 1.4, 1.4, 160, 12, 1, true );
+		beamGeo.translate( 0, 80 + 24, 0 );
+		const beam = new THREE.Mesh( beamGeo, beamMat );
+		beam.position.z = - 3;
+		g.add( beam );
+
+		const light = new THREE.PointLight( 0xffb060, 80, 40, 1.6 );
+		light.position.set( 0, 6, 0 );
+		g.add( light );
+
+	}
+
+	// ride the swell: sample the sea at bow, stern and both sides for height, pitch and roll
+	float( dt, snap = false ) {
+
+		const g = this.group, yaw = g.rotation.y;
+		const fx = Math.sin( yaw ), fz = Math.cos( yaw ), rx = fz, rz = - fx;
+		const at = ( a, s ) => this.sea.heightAt( g.position.x + fx * a + rx * s, g.position.z + fz * a + rz * s );
+		const bow = at( HALF * 0.8, 0 ), stern = at( - HALF * 0.8, 0 ), left = at( 0, - W ), right = at( 0, W ); // right = local +x
+		const mean = ( bow + stern + left + right ) / 4;
+		const pitch = Math.atan2( bow - stern, SHIP.length * 0.8 ), roll = Math.atan2( right - left, SHIP.beam ); // +z rotation lifts local +x
+		const k = snap ? 1 : 1 - Math.exp( - SHIP.response * dt );
+		this.lift += ( mean - this.lift ) * k;
+		this.pitch += ( pitch - this.pitch ) * k;
+		this.roll += ( roll - this.roll ) * k;
+		g.position.y = this.lift + SHIP.freeboard - 0.4;
+		g.rotation.x = - this.pitch;
+		g.rotation.z = this.roll;
+
+	}
+
+	update( dt ) {
+
+		this.time += dt;
+		this.float( dt );
+
+	}
+
+	// deck height in world space (at the ship's centre)
+	get deckY() {
+
+		return this.group.position.y + 0.4;
+
+	}
+
+	// keep the board out of the hull (an oriented box), unless it's jumping clear over the rail
+	collide( surfer ) {
+
+		const p = surfer.position, v = surfer.velocity, g = this.group.position;
+		if ( p.y > this.deckY + 1.5 ) return;
+		const fx = Math.sin( this.group.rotation.y ), fz = Math.cos( this.group.rotation.y );
+		const lx = p.x - g.x, lz = p.z - g.z;
+		const along = lx * fx + lz * fz, across = lx * fz - lz * fx;
+		const pa = HALF + 0.7 - Math.abs( along ), pc = W + 0.7 - Math.abs( across );
+		if ( pa <= 0 || pc <= 0 ) return;
+		let nx, nz, depth;
+		if ( pc < pa ) {
+
+			const s = Math.sign( across ) || 1;
+			nx = fz * s; nz = - fx * s; depth = pc;
+
+		} else {
+
+			const s = Math.sign( along ) || 1;
+			nx = fx * s; nz = fz * s; depth = pa;
+
+		}
+		p.x += nx * depth;
+		p.z += nz * depth;
+		const into = v.x * nx + v.z * nz;
+		if ( into < 0 ) {
+
+			v.x -= nx * into * 1.3;
+			v.z -= nz * into * 1.3;
+
+		}
+
+	}
+
+}
