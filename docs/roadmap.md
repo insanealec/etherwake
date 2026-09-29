@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 6, leviathans (slices 1-2 done: pod swimming and breaching, bow-wave riding). Milestone 5 done.
+- **Current milestone:** 6, leviathans (slices 1-3 done: pod, bow-wave riding, song). Milestone 5 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -102,6 +102,17 @@
   wave: +5 credits every 4 s (`REWARDS.bow*`). Test: a board placed on the lead's bow face going 13 m/s
   stayed with the whale for 12 s and earned the bonus. **Test gotcha:** `import()`-ing a module from the
   console can load a second copy with separate state (e.g. `bowHeightAt` read 0); go through `__ew`.
+- **Milestone 6 slice 3 (2026-09-29):** the first audio. `src/audio/Audio.js`: disabled by `?noAudio`
+  **or** localStorage `etherwake.noAudio` = '1' (set in the test pane; the preview port changes, so the
+  flag is the reliable way); the AudioContext only starts on a trusted key press or click (scripted
+  `__ew.input` can't start it); master volume 0.35 through a limiter; M mutes (remembered); a generated
+  5 s hall reverb; the listener follows the camera. `src/audio/WhaleSong.js`: synthesised calls (sine +
+  soft triangle harmonic gliding through 4 pitches, vibrato, lowpass, reverb send), one PannerNode per
+  whale (inverse distance, ref 150 m), a call every 7-18 s, 50% chance another whale answers; the calf
+  sings higher. Levels checked by silent `OfflineAudioContext` renders: peak ~0.14 full scale at 60 m,
+  ~0.04 at 500 m. Tweak panel: Audio folder (volume, mute). "A leviathan pod!" toast within 300 m (at
+  most every 3 minutes). **Audio testing rule:** set `localStorage['etherwake.noAudio'] = '1'` in the test
+  pane before anything; verify sound only with offline renders.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -165,9 +176,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 6 slice 3: **song** (the first audio; add `?noAudio` and use it for every automated run;
-WebAudio, procedural synthesis or a CC0 Freesound recording listed in `CREDITS.md`; distance-based volume
-from the pod), a pod-sighting toast, maybe a breach splash ring. Then milestone 7 (the galleon).
+Get the user's ear on the whale song (volume, pitch, how often). Candidate polish: a breach splash ring
+and sound, an ambient sea bed (soft whoosh), board and sail sounds. Then **milestone 7 (the galleon)**:
+a small solar galleon to board, walk the deck, take the helm, sail between regions, launch the board
+from the deck.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

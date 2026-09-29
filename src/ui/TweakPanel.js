@@ -3,6 +3,7 @@ import { SEA, WAVES } from '../sea/Waves.js';
 import { PALETTE, FOG } from '../sea/Etherium.js';
 import { BOARD } from '../game/Gear.js';
 import { WIND } from '../world/Wind.js';
+import { AUDIO } from '../audio/Audio.js';
 
 // Debug tweak panel (lil-gui). H toggles it; hidden by default, `?tweaks` opens it on load.
 // Edits the data tables in place; wave edits call sea.refresh() to re-upload uniforms.
@@ -69,6 +70,10 @@ export class TweakPanel {
 		const wind = gui.addFolder( 'Wind' ).close();
 		wind.add( WIND, 'angle', - 180, 180, 1 ).name( 'angle (0 = +x)' );
 		wind.add( WIND, 'strength', 0, 3, 0.01 );
+
+		const sound = gui.addFolder( 'Audio' ).close();
+		sound.add( AUDIO, 'volume', 0, 1, 0.01 ).name( 'master volume' ).onChange( ( v ) => app.audio.setVolume( v ) );
+		sound.add( { muted: app.audio.muted }, 'muted' ).name( 'muted (M)' ).onChange( ( v ) => app.audio.setMuted( v ) );
 
 		gui.add( { reset: () => app.save.reset() }, 'reset' ).name( 'reset saved progress' );
 

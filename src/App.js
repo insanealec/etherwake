@@ -22,6 +22,8 @@ import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Leviathans } from './world/Leviathans.js';
+import { Audio } from './audio/Audio.js';
+import { WhaleSong } from './audio/WhaleSong.js';
 import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
@@ -43,6 +45,7 @@ export class App {
 		this.container = container;
 		this.params = new URLSearchParams( location.search );
 		this.save = new Save();
+		this.audio = new Audio( this.params );
 		applyUpgrades( this.save.data.upgrades );
 
 		this.renderer = new THREE.WebGPURenderer( { antialias: true } );
@@ -98,6 +101,7 @@ export class App {
 		this.promptEl = document.getElementById( 'prompt' );
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.leviathans = new Leviathans( this.scene, this.sea );
+		this.song = new WhaleSong( this.audio, this.leviathans );
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
 		this.creditsEl = document.getElementById( 'credits' );
 		this.objectiveEl = document.getElementById( 'objective' );
@@ -157,7 +161,7 @@ export class App {
 		this.hudHint = {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
-			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · H tweaks'
+			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · M mute · H tweaks'
 		}[ mode ];
 
 	}
@@ -220,6 +224,9 @@ export class App {
 		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
 		this.leviathans.update( dt );
+		this.song.update( dt, this.camera.position );
+		this.audio.update( this.camera );
+		this.spotPod();
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
 		this.onRace( this.race.update( dt, this.surfer ) );
@@ -447,6 +454,20 @@ export class App {
 			}
 			this.save.addCredits( pay );
 			this.toast( `${ c.name } · ${ formatTime( t ) }${ medal ? ` · ${ medal }!` : '' }${ best ? ' · new best' : '' } · +${ pay } ✦` );
+
+		}
+
+	}
+
+	// First sight of the pod (within 300 m) gets a callout, at most every few minutes.
+	spotPod() {
+
+		const p = this.onFoot ? this.walker.position : this.surfer.position;
+		const near = this.leviathans.whales.some( ( w ) => w.mesh.position.distanceTo( p ) < 300 );
+		if ( near && this.time > ( this.podSeenAt ?? - Infinity ) + 180 ) {
+
+			this.podSeenAt = this.time;
+			this.toast( 'A leviathan pod!' );
 
 		}
 
