@@ -167,7 +167,7 @@ export class App {
 		this.hudHint = {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
-			helm: 'A/D steer · W raise sails · S lower sails · E leave the helm · F fly · M mute · H tweaks',
+			helm: 'A/D steer · W more sail · S less sail · E leave the helm · F fly · M mute · H tweaks',
 			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · M mute · H tweaks'
 		}[ mode ];
 

@@ -12,7 +12,7 @@ export const QUARTERMASTER = {
 	// once you own her
 	ownedLines: [
 		'Captain! She\'s yours now, papers and all.',
-		'The helm\'s just forward of the stern castle. Raise the sails with W, lower them with S, and give her room to turn.'
+		'The helm\'s just forward of the stern castle. W lets out more sail, S takes it in, and give her room to turn.'
 	]
 };
 
