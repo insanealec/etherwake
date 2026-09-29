@@ -21,6 +21,7 @@ import { Dialogue } from './ui/Dialogue.js';
 import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
+import { Courier } from './game/Courier.js';
 import { SPAWN } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
@@ -90,6 +91,11 @@ export class App {
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
 		this.creditsEl = document.getElementById( 'credits' );
+		this.objectiveEl = document.getElementById( 'objective' );
+		this.courier = new Courier( this.scene, this.sea, this.surfer );
+		const dockmaster = this.npcs.list.find( ( n ) => n.id === 'dockmaster' );
+		this.courier.dropoff = dockmaster.buoy.position;
+		this.atDropoff = ( p ) => Math.hypot( p.x - dockmaster.buoy.position.x, p.z - dockmaster.buoy.position.z ) < 7;
 		this.save.onChange( ( d ) => this.showCredits( d.credits ) );
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
@@ -202,6 +208,7 @@ export class App {
 		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
+		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
 
@@ -215,6 +222,7 @@ export class App {
 		for ( const m of this.motes ) m.update( this.camera, this.surfer );
 		if ( this.shells ) this.shells.update();
 		this.updateHud();
+		this.updateObjective();
 		input.endFrame();
 		this.pipeline.render();
 
@@ -227,7 +235,12 @@ export class App {
 		let prompt = '';
 		if ( this.dialogue.active ) {
 
-			if ( e || input.wasPressed( 'Space' ) ) this.dialogue.next();
+			if ( this.dialogue.atChoice ) {
+
+				if ( e ) this.dialogue.choose( 'KeyE' );
+				else if ( input.wasPressed( 'KeyQ' ) ) this.dialogue.choose( 'KeyQ' );
+
+			} else if ( e || input.wasPressed( 'Space' ) ) this.dialogue.next();
 
 		} else if ( this.mode === 'surf' && this.surfer.grounded && this.surfer.speed < 10 ) {
 
@@ -238,7 +251,7 @@ export class App {
 			if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
-				if ( e ) this.dialogue.open( npc.name, npc.lines );
+				if ( e ) this.talkTo( npc );
 
 			} else if ( spot ) {
 
@@ -255,7 +268,7 @@ export class App {
 			if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
-				if ( e ) this.dialogue.open( npc.name, npc.lines );
+				if ( e ) this.talkTo( npc );
 
 			} else if ( edge ) {
 
@@ -273,6 +286,81 @@ export class App {
 			this.promptEl.style.opacity = prompt ? 1 : 0;
 
 		}
+
+	}
+
+	// Characters with something to offer build their conversation here; others just chat.
+	talkTo( npc ) {
+
+		if ( npc.id !== 'dockmaster' ) return this.dialogue.open( npc.name, npc.lines );
+		const c = this.courier;
+		if ( c.state !== 'idle' ) {
+
+			return this.dialogue.open( npc.name, [ c.state === 'fetch' ? "That parcel won't fetch itself. Clock's ticking!" : 'Is that my parcel? Bring it right up to the mooring.' ], [
+				{ key: 'KeyE', label: 'E · on my way' },
+				{ key: 'KeyQ', label: 'Q · abandon the job', action: () => {
+
+					c.abandon();
+					this.toast( 'Job abandoned' );
+
+				} }
+			] );
+
+		}
+		const o = c.makeOffer();
+		const clock = `${ Math.floor( o.time / 60 ) }:${ String( o.time % 60 ).padStart( 2, '0' ) }`;
+		this.dialogue.open( npc.name, [
+			npc.lines[ 0 ],
+			`Got a parcel bobbing at a buoy about ${ o.dist } m ${ o.heading } of here. Bring it to my mooring within ${ clock } and it's ${ o.pay } credits. Quicker than half that, I'll add a bonus.`
+		], [
+			{ key: 'KeyE', label: 'E · accept', action: () => {
+
+				c.accept();
+				this.toast( 'Courier job: follow the teal beacon' );
+
+			} },
+			{ key: 'KeyQ', label: 'Q · not now' }
+		] );
+
+	}
+
+	onCourier( event ) {
+
+		if ( event === 'picked' ) this.toast( 'Parcel aboard · back to the dockmaster' );
+		else if ( event === 'failed' ) this.toast( 'Out of time · the parcel drifted off' );
+		else if ( event === 'delivered' ) {
+
+			const pay = this.courier.payout, quick = pay > this.courier.job.pay;
+			this.save.addCredits( pay );
+			this.save.stat( 'jobs', ( n ) => n + 1 );
+			this.toast( `Delivered${ quick ? ' · quick bonus' : '' } · +${ pay } ✦` );
+
+		}
+
+	}
+
+	// top-of-screen objective: an arrow toward the target (relative to the camera), distance and time
+	updateObjective() {
+
+		const t = this.courier.target;
+		if ( ! t ) {
+
+			if ( this.objectiveShown ) this.objectiveEl.style.opacity = 0;
+			this.objectiveShown = false;
+			return;
+
+		}
+		const cam = this.camera.position, f = this.camera.getWorldDirection( this._fwd || ( this._fwd = new THREE.Vector3() ) );
+		const dx = t.x - cam.x, dz = t.z - cam.z, d = Math.hypot( dx, dz );
+		const ang = Math.atan2( f.x * dz - f.z * dx, f.x * dx + f.z * dz ) * 180 / Math.PI;
+		const left = Math.max( 0, Math.ceil( this.courier.timeLeft ) );
+		const clock = `${ Math.floor( left / 60 ) }:${ String( left % 60 ).padStart( 2, '0' ) }`;
+		this.objectiveEl.querySelector( '.arrow' ).style.transform = `rotate( ${ ang.toFixed( 0 ) }deg )`;
+		const text = `${ t.label } · ${ Math.round( d ) } m · ${ clock }`;
+		if ( text !== this.objectiveText ) this.objectiveEl.querySelector( '.label' ).textContent = this.objectiveText = text;
+		this.objectiveEl.classList.toggle( 'urgent', left <= 20 );
+		if ( ! this.objectiveShown ) this.objectiveEl.style.opacity = 1;
+		this.objectiveShown = true;
 
 	}
 

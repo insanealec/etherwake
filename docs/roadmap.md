@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 5, the loop (slice 1 done: credits, stardust, trick payouts, save). Milestone 4 done.
+- **Current milestone:** 5, the loop (slices 1 and 2 done: credits, stardust, trick payouts, save, courier jobs). Milestone 4 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -40,6 +40,16 @@
   the harbour, mostly along the crests; 35% arc 7 m high over a crest so you have to jump), instanced
   spinning gold octahedra riding the swell, a faint light pillar per trail for finding it from afar
   (fades up close), trails respawn after 90 s. +1 per mote, +5 per whole trail.
+- **Milestone 5 slice 2 (2026-09-28):** courier jobs. The user had noticed NPCs "still say the
+  placeholder" (true: jobs and shop weren't built yet). `src/game/Jobs.js` (`COURIER` tuning) and
+  `src/game/Courier.js` (offer, accept, parcel buoy with a teal beacon, crate carried on the board,
+  delivery at the dockmaster's mooring, timeout, abandon; `update()` returns 'picked' / 'delivered' /
+  'failed'). The dockmaster's conversation is built in `App.talkTo()`: an offer with distance, compass
+  heading, time and pay, then E accept / Q not now (`Dialogue` now supports `choices` on the last line);
+  mid-job it offers "abandon". Pay: 25 + 0.09/m, +50% if delivered with over half the time left.
+  `#objective` HUD: an arrow relative to the camera, the distance and a countdown (red under 20 s).
+  **Gotcha:** apostrophes in JS strings written through python edit scripts lost their escaping and
+  broke the page (a SyntaxError left `__ew` undefined); use double-quoted JS strings for such text.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -103,11 +113,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 5 slice 2: **courier jobs** from the dockmaster (talk at the mooring: accept a job, a parcel
-buoy appears somewhere out at sea with a pillar, pick it up by riding through, bring it back to the
-dockmaster's mooring before a generous timer; pays credits scaled by distance). Then slice 3: the
-**shipwright's shop** (upgrade tiers in `game/Gear.js` that modify `BOARD` / `WIND` numbers; buy at the
-shipwright's mooring; saved). Then slice 4: **races** (gates against the clock, later a rival).
+Milestone 5 slice 3: the **shipwright's shop**. Upgrade tiers in `game/Gear.js` that modify the `BOARD` /
+`WIND` numbers (e.g. sail power, top speed / drag, grip, pop / air), bought with credits in a shop dialogue
+at the shipwright's mooring, saved in `Save`, applied on load. Then slice 4: **races** (gates against
+the clock, later a rival).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
