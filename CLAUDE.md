@@ -39,8 +39,10 @@ techniques that can be upgraded later.
 - Drive it from JS through the `window.__ew` debug handle (the App instance). For input:
   `__ew.input.keys.add('KeyW')` / `.delete(...)`. Don't rely on synthesized key events.
 - Take a screenshot as proof for visual changes.
-- **Audio must be muted in any automated testing.** Loud test audio has hurt the user before. Once audio
-  exists, add `?noAudio` and use it for every automated run.
+- **Audio must be muted in any automated testing.** Loud test audio has hurt the user before. Use
+  `?noAudio`, and before anything else in the test pane run `localStorage.setItem( 'etherwake.noAudio', '1' )`
+  and reload (the preview port changes, so the URL flag alone is easy to lose). Check sound levels with
+  silent `OfflineAudioContext` renders, never by playing it.
 
 ## Git
 - Commit after each working step so it can be rolled back. Branch `main`.
