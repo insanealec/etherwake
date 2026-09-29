@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 5, the loop (slices 1 and 2 done: credits, stardust, trick payouts, save, courier jobs). Milestone 4 done.
+- **Current milestone:** 5, the loop (slices 1-3 done: credits, stardust, trick payouts, save, courier jobs, shop). Milestone 4 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -50,6 +50,16 @@
   `#objective` HUD: an arrow relative to the camera, the distance and a countdown (red under 20 s).
   **Gotcha:** apostrophes in JS strings written through python edit scripts lost their escaping and
   broke the page (a SyntaxError left `__ew` undefined); use double-quoted JS strings for such text.
+- **Milestone 5 slice 3 (2026-09-28):** the user asked to remove the piers ("they just get in the way,
+  docking around the boardwalk is fine"): the port is now just the ring (lantern posts and 4 point
+  lights around its outer edge; `dockPoint` / `launchEdge` / `walkable` / `collide` are ring-only);
+  spawn moved to (70, 6). The shipwright's shop: `UPGRADES` in `src/game/Gear.js` (sail canvas: thrust;
+  hull polish: dragQuad; grip rails: grip + turnRate; pop springs: jump + maxLaunch; 3 tiers each,
+  60 to 500 credits), `BASE_BOARD` and `applyUpgrades( levels )` (reset BOARD then apply owned tiers;
+  called on load and after each purchase). `Save` gained `upgrades`, `spend()`, `level()`,
+  `setLevel()`. `App.openShop()` / `buy()`: talk at the shipwright's mooring, 1-4 buys the next tier,
+  Q leaves; the shop reopens with the shipwright's reply. `Dialogue` choices are generic keys now and
+  list one per line when there are more than two.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -113,10 +123,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 5 slice 3: the **shipwright's shop**. Upgrade tiers in `game/Gear.js` that modify the `BOARD` /
-`WIND` numbers (e.g. sail power, top speed / drag, grip, pop / air), bought with credits in a shop dialogue
-at the shipwright's mooring, saved in `Save`, applied on load. Then slice 4: **races** (gates against
-the clock, later a rival).
+Milestone 5 slice 4: **races** (a course of gates out on the swell against the clock, started from an
+NPC or a start buoy; best times saved; later a rival). Maybe show upgrades on the board (sail colour per
+tier). Then call milestone 5 done and look at milestone 6 (leviathans).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

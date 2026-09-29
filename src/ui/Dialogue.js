@@ -57,7 +57,7 @@ export class Dialogue {
 
 		const last = this.index === this.lines.length - 1;
 		this.textEl.textContent = this.lines[ this.index ] + ( last ? '' : '  ▸' );
-		this.choicesEl.textContent = last && this.choices ? this.choices.map( ( c ) => c.label ).join( '     ' ) : '';
+		this.choicesEl.textContent = last && this.choices ? this.choices.map( ( c ) => c.label ).join( this.choices.length > 2 ? '\n' : '     ' ) : '';
 
 	}
 

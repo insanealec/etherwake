@@ -4,14 +4,11 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HARBOR } from './WorldLayout.js';
 
 // Brasslight Harbor (working name), procedural first pass (milestone 4): a floating moonlet ringed by a
-// boardwalk, four piers on pilings, lanterns, shacks, banners and a lighthouse with a sweeping beam.
-// Also owns simple 2D colliders (circle + pier rectangles) that stop the board.
+// boardwalk on pilings, lanterns, shacks, banners and a lighthouse with a sweeping beam. You dock and
+// launch anywhere around the boardwalk's outer edge. The ring is a circle collider that stops the board.
 export const DECK_Y = 2.0; // deck height above the calm harbour surface
 const RING_IN = 42;
 const RING_OUT = 54;
-const PIER_LEN = 52;
-const PIER_W = 5;
-const PIER_ANGLES = [ 0, Math.PI / 2, Math.PI, Math.PI * 1.5 ];
 const BOARD_R = 0.7; // board collision radius
 
 export class Port {
@@ -31,14 +28,8 @@ export class Port {
 		this.buildLighthouse( mats );
 		this.buildBanners( mats );
 
-		// colliders in world space
+		// collider in world space
 		this.circle = { x: HARBOR.x, z: HARBOR.z, r: RING_OUT };
-		this.rects = PIER_ANGLES.map( ( a ) => {
-
-			const mid = RING_OUT + PIER_LEN / 2 - 1;
-			return { x: HARBOR.x + Math.cos( a ) * mid, z: HARBOR.z + Math.sin( a ) * mid, ax: Math.cos( a ), az: Math.sin( a ), halfLen: PIER_LEN / 2, halfW: PIER_W / 2 };
-
-		} );
 
 	}
 
@@ -104,78 +95,43 @@ export class Port {
 		ring.position.y = DECK_Y;
 		this.group.add( ring );
 
-		// piers
-		for ( const a of PIER_ANGLES ) {
-
-			const pier = new THREE.Mesh( new THREE.BoxGeometry( PIER_W, 0.5, PIER_LEN ), wood );
-			const mid = RING_OUT + PIER_LEN / 2 - 1;
-			pier.position.set( Math.cos( a ) * mid, DECK_Y - 0.25, Math.sin( a ) * mid );
-			pier.rotation.y = Math.PI / 2 - a;
-			this.group.add( pier );
-
-		}
-
-		// pilings under the ring and the piers (instanced)
-		const spots = [];
-		for ( let i = 0; i < 36; i ++ ) {
-
-			const a = i / 36 * Math.PI * 2;
-			spots.push( [ Math.cos( a ) * ( RING_OUT - 1 ), Math.sin( a ) * ( RING_OUT - 1 ) ] );
-
-		}
-		for ( const a of PIER_ANGLES ) {
-
-			for ( let d = RING_OUT + 6; d < RING_OUT + PIER_LEN; d += 8 ) {
-
-				for ( const side of [ - 1, 1 ] ) {
-
-					const px = - Math.sin( a ) * side * ( PIER_W / 2 - 0.3 ), pz = Math.cos( a ) * side * ( PIER_W / 2 - 0.3 );
-					spots.push( [ Math.cos( a ) * d + px, Math.sin( a ) * d + pz ] );
-
-				}
-
-			}
-
-		}
-		const piling = new THREE.InstancedMesh( new THREE.CylinderGeometry( 0.3, 0.35, 14, 8 ), wood, spots.length );
+		// pilings under the outer edge (instanced)
+		const count = 36;
+		const piling = new THREE.InstancedMesh( new THREE.CylinderGeometry( 0.3, 0.35, 14, 8 ), wood, count );
 		const m = new THREE.Matrix4();
-		spots.forEach( ( [ x, z ], i ) => piling.setMatrixAt( i, m.makeTranslation( x, DECK_Y - 7, z ) ) );
+		for ( let i = 0; i < count; i ++ ) {
+
+			const a = i / count * Math.PI * 2;
+			piling.setMatrixAt( i, m.makeTranslation( Math.cos( a ) * ( RING_OUT - 1 ), DECK_Y - 7, Math.sin( a ) * ( RING_OUT - 1 ) ) );
+
+		}
 		this.group.add( piling );
 
 	}
 
 	buildLanterns( { brass, glow } ) {
 
-		// lantern posts along both sides of every pier, plus the pier-end lights
-		const spots = [];
-		for ( const a of PIER_ANGLES ) {
+		// lantern posts around the outer edge, and a few warm point lights over the boardwalk
+		const count = 24;
+		const posts = new THREE.InstancedMesh( new THREE.CylinderGeometry( 0.06, 0.08, 3, 6 ), brass, count );
+		const lamps = new THREE.InstancedMesh( new THREE.SphereGeometry( 0.22, 10, 8 ), glow, count );
+		const m = new THREE.Matrix4();
+		for ( let i = 0; i < count; i ++ ) {
 
-			for ( let d = RING_OUT + 10; d <= RING_OUT + PIER_LEN - 2; d += 14 ) {
+			const a = ( i + 0.25 ) / count * Math.PI * 2, r = RING_OUT - 0.4;
+			posts.setMatrixAt( i, m.makeTranslation( Math.cos( a ) * r, DECK_Y + 1.5, Math.sin( a ) * r ) );
+			lamps.setMatrixAt( i, m.makeTranslation( Math.cos( a ) * r, DECK_Y + 3.1, Math.sin( a ) * r ) );
 
-				for ( const side of [ - 1, 1 ] ) {
+		}
+		this.group.add( posts, lamps );
+		for ( let i = 0; i < 4; i ++ ) {
 
-					spots.push( [ Math.cos( a ) * d - Math.sin( a ) * side * ( PIER_W / 2 - 0.2 ), Math.sin( a ) * d + Math.cos( a ) * side * ( PIER_W / 2 - 0.2 ) ] );
-
-				}
-
-			}
-			// a warm point light at each pier end
+			const a = ( i + 0.5 ) / 4 * Math.PI * 2;
 			const light = new THREE.PointLight( 0xffa050, 60, 45, 1.6 );
-			const end = RING_OUT + PIER_LEN - 3;
-			light.position.set( Math.cos( a ) * end, DECK_Y + 3.5, Math.sin( a ) * end );
+			light.position.set( Math.cos( a ) * ( RING_OUT - 1 ), DECK_Y + 3.5, Math.sin( a ) * ( RING_OUT - 1 ) );
 			this.group.add( light );
 
 		}
-		const posts = new THREE.InstancedMesh( new THREE.CylinderGeometry( 0.06, 0.08, 3, 6 ), brass, spots.length );
-		const lamps = new THREE.InstancedMesh( new THREE.SphereGeometry( 0.22, 10, 8 ), glow, spots.length );
-		const m = new THREE.Matrix4();
-		spots.forEach( ( [ x, z ], i ) => {
-
-			posts.setMatrixAt( i, m.makeTranslation( x, DECK_Y + 1.5, z ) );
-			lamps.setMatrixAt( i, m.makeTranslation( x, DECK_Y + 3.1, z ) );
-
-		} );
-		this.group.add( posts, lamps );
 
 	}
 
@@ -276,117 +232,45 @@ export class Port {
 
 	}
 
-	// Docking from the board: the nearest deck spot within reach of a board at (x, z), or null.
+	// Docking from the board: the deck spot next to a board at (x, z) near the boardwalk, or null.
 	dockPoint( x, z ) {
 
-		const cands = [];
 		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
-		if ( r > RING_OUT - 1 && r < RING_OUT + 6 ) cands.push( { x: HARBOR.x + lx / r * ( RING_OUT - 1.2 ), z: HARBOR.z + lz / r * ( RING_OUT - 1.2 ) } );
-		for ( const p of this.rects ) {
-
-			const dx = x - p.x, dz = z - p.z;
-			const along = dx * p.ax + dz * p.az, across = - dx * p.az + dz * p.ax;
-			if ( Math.abs( along ) < p.halfLen + 5 && Math.abs( across ) < p.halfW + 5 ) {
-
-				const a = Math.max( - p.halfLen + 1.2, Math.min( p.halfLen - 1.2, along ) );
-				const c = Math.max( - p.halfW + 1.2, Math.min( p.halfW - 1.2, across ) );
-				cands.push( { x: p.x + p.ax * a - p.az * c, z: p.z + p.az * a + p.ax * c } );
-
-			}
-
-		}
-		let best = null, bestD = 6;
-		for ( const c of cands ) {
-
-			const d = Math.hypot( c.x - x, c.z - z );
-			if ( d < bestD && this.walkable( c.x, c.z ) ) {
-
-				best = c;
-				bestD = d;
-
-			}
-
-		}
-		return best;
+		if ( r < RING_OUT - 1 || r > RING_OUT + 6 ) return null;
+		const spot = { x: HARBOR.x + lx / r * ( RING_OUT - 1.2 ), z: HARBOR.z + lz / r * ( RING_OUT - 1.2 ) };
+		return this.walkable( spot.x, spot.z ) ? spot : null;
 
 	}
 
-	// Launching on foot: if (x, z) is at an outer edge of the deck, the sea spot just past it and the
-	// heading out, else null. The inner ring edge (the moonlet side) doesn't count.
+	// Launching on foot: at the boardwalk's outer edge, the sea spot just past it and the heading out,
+	// else null. The inner edge (the moonlet side) doesn't count.
 	launchEdge( x, z ) {
 
 		if ( ! this.walkable( x, z ) ) return null;
-		const out = 3.5;
-		for ( const p of this.rects ) {
-
-			const dx = x - p.x, dz = z - p.z;
-			const along = dx * p.ax + dz * p.az, across = - dx * p.az + dz * p.ax;
-			if ( Math.abs( along ) > p.halfLen || Math.abs( across ) > p.halfW ) continue;
-			if ( along > p.halfLen - 2.5 ) {
-
-				const d = p.halfLen + out;
-				return { x: p.x + p.ax * d - p.az * across, z: p.z + p.az * d + p.ax * across, yaw: Math.atan2( p.ax, p.az ) };
-
-			}
-			if ( Math.abs( across ) > p.halfW - 1.6 && along > - p.halfLen + 3 ) {
-
-				const sgn = Math.sign( across ), c = sgn * ( p.halfW + out );
-				return { x: p.x + p.ax * along - p.az * c, z: p.z + p.az * along + p.ax * c, yaw: Math.atan2( - p.az * sgn, p.ax * sgn ) };
-
-			}
-
-		}
 		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
-		if ( r > RING_OUT - 2.2 ) {
-
-			const sx = HARBOR.x + lx / r * ( RING_OUT + out ), sz = HARBOR.z + lz / r * ( RING_OUT + out );
-			// not where a pier root meets the ring
-			for ( const p of this.rects ) {
-
-				const dx = sx - p.x, dz = sz - p.z;
-				if ( Math.abs( dx * p.ax + dz * p.az ) < p.halfLen + 1 && Math.abs( - dx * p.az + dz * p.ax ) < p.halfW + 1.5 ) return null;
-
-			}
-			return { x: sx, z: sz, yaw: Math.atan2( lx, lz ) };
-
-		}
-		return null;
+		if ( r < RING_OUT - 2.2 ) return null;
+		return { x: HARBOR.x + lx / r * ( RING_OUT + 3.5 ), z: HARBOR.z + lz / r * ( RING_OUT + 3.5 ), yaw: Math.atan2( lx, lz ) };
 
 	}
 
-	// Can someone stand here? The boardwalk ring or a pier, not inside a shack.
+	// Can someone stand here? On the boardwalk ring, not inside a shack.
 	walkable( x, z ) {
 
-		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
-		let ok = r > RING_IN + 0.6 && r < RING_OUT - 0.4;
-		if ( ! ok ) {
+		const r = Math.hypot( x - HARBOR.x, z - HARBOR.z );
+		if ( r < RING_IN + 0.6 || r > RING_OUT - 0.4 ) return false;
+		for ( const s of this.shacks ) {
 
-			for ( const p of this.rects ) {
-
-				const dx = x - p.x, dz = z - p.z;
-				const along = dx * p.ax + dz * p.az, across = - dx * p.az + dz * p.ax;
-				if ( Math.abs( along ) < p.halfLen - 0.3 && Math.abs( across ) < p.halfW - 0.4 ) ok = true;
-
-			}
+			const dx = x - s.x, dz = z - s.z;
+			const depth = dx * s.ax + dz * s.az, width = - dx * s.az + dz * s.ax;
+			if ( Math.abs( depth ) < s.halfDepth + 0.3 && Math.abs( width ) < s.halfWidth + 0.3 ) return false;
 
 		}
-		if ( ok ) {
-
-			for ( const s of this.shacks ) {
-
-				const dx = x - s.x, dz = z - s.z;
-				const depth = dx * s.ax + dz * s.az, width = - dx * s.az + dz * s.ax;
-				if ( Math.abs( depth ) < s.halfDepth + 0.3 && Math.abs( width ) < s.halfWidth + 0.3 ) return false;
-
-			}
-
-		}
-		return ok;
+		return true;
 
 	}
 
-	// Push the board out of the moonlet ring and the piers, sliding along them. Skipped while the board
-	// is well above deck height, so you can jump over a pier.
+	// Push the board out of the boardwalk ring, sliding along it. Skipped while the board is well above
+	// deck height, so a big jump can clear the edge.
 	collide( surfer ) {
 
 		const p = surfer.position, v = surfer.velocity;
@@ -408,29 +292,6 @@ export class Port {
 		const c = this.circle;
 		const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot( dx, dz );
 		if ( d < c.r + BOARD_R && d > 1e-3 ) push( dx / d, dz / d, c.r + BOARD_R - d );
-
-		for ( const r of this.rects ) {
-
-			const lx = p.x - r.x, lz = p.z - r.z;
-			const along = lx * r.ax + lz * r.az, across = - lx * r.az + lz * r.ax;
-			const pa = r.halfLen + BOARD_R - Math.abs( along ), pc = r.halfW + BOARD_R - Math.abs( across );
-			if ( pa > 0 && pc > 0 ) {
-
-				if ( pc < pa ) {
-
-					const s = Math.sign( across ) || 1;
-					push( - r.az * s, r.ax * s, pc );
-
-				} else {
-
-					const s = Math.sign( along ) || 1;
-					push( r.ax * s, r.az * s, pa );
-
-				}
-
-			}
-
-		}
 
 	}
 

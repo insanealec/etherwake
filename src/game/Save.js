@@ -2,7 +2,7 @@
 // so every access is wrapped and the game runs fine without it.
 const KEY = 'etherwake.save.v1';
 
-const DEFAULTS = { credits: 0, stats: { stardust: 0, tricks: 0, bestAir: 0 } };
+const DEFAULTS = { credits: 0, upgrades: {}, stats: { stardust: 0, tricks: 0, bestAir: 0 } };
 
 export class Save {
 
@@ -34,6 +34,29 @@ export class Save {
 
 		if ( ! n ) return;
 		this.data.credits += n;
+		this.changed();
+
+	}
+
+	// spend credits if there are enough; returns whether it happened
+	spend( n ) {
+
+		if ( this.data.credits < n ) return false;
+		this.data.credits -= n;
+		this.changed();
+		return true;
+
+	}
+
+	level( id ) {
+
+		return this.data.upgrades[ id ] || 0;
+
+	}
+
+	setLevel( id, level ) {
+
+		this.data.upgrades[ id ] = level;
 		this.changed();
 
 	}

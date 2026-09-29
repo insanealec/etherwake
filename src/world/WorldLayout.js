@@ -10,5 +10,5 @@ export const HARBOR = {
 	calm: 0.1
 };
 
-// Where the surfer starts: just off the east pier's end, heading out to sea.
-export const SPAWN = { x: 118, z: 6, yaw: Math.PI / 2 };
+// Where the surfer starts: just off the boardwalk's east side, heading out to sea.
+export const SPAWN = { x: 70, z: 6, yaw: Math.PI / 2 };

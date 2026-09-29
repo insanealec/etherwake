@@ -22,6 +22,7 @@ import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Courier } from './game/Courier.js';
+import { UPGRADES, applyUpgrades, tierName } from './game/Gear.js';
 import { SPAWN } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
@@ -36,6 +37,7 @@ export class App {
 		this.container = container;
 		this.params = new URLSearchParams( location.search );
 		this.save = new Save();
+		applyUpgrades( this.save.data.upgrades );
 
 		this.renderer = new THREE.WebGPURenderer( { antialias: true } );
 		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
@@ -237,8 +239,8 @@ export class App {
 
 			if ( this.dialogue.atChoice ) {
 
-				if ( e ) this.dialogue.choose( 'KeyE' );
-				else if ( input.wasPressed( 'KeyQ' ) ) this.dialogue.choose( 'KeyQ' );
+				const pick = this.dialogue.choices.find( ( c ) => input.wasPressed( c.key ) );
+				if ( pick ) this.dialogue.choose( pick.key );
 
 			} else if ( e || input.wasPressed( 'Space' ) ) this.dialogue.next();
 
@@ -292,6 +294,7 @@ export class App {
 	// Characters with something to offer build their conversation here; others just chat.
 	talkTo( npc ) {
 
+		if ( npc.id === 'shipwright' ) return this.openShop( npc );
 		if ( npc.id !== 'dockmaster' ) return this.dialogue.open( npc.name, npc.lines );
 		const c = this.courier;
 		if ( c.state !== 'idle' ) {
@@ -321,6 +324,40 @@ export class App {
 			} },
 			{ key: 'KeyQ', label: 'Q · not now' }
 		] );
+
+	}
+
+	// The shipwright's shop: 1-4 buys the next tier of an upgrade line, Q leaves. Buying reopens the shop.
+	openShop( npc, line = null ) {
+
+		const choices = UPGRADES.map( ( up, i ) => {
+
+			const level = this.save.level( up.id ), next = up.tiers[ level ];
+			const label = next ? `${ i + 1 } · ${ tierName( up, level + 1 ) } (${ up.blurb }) · ${ next.cost } ✦` : `${ i + 1 } · ${ tierName( up, level ) } · fitted, the best I make`;
+			return { key: `Digit${ i + 1 }`, label, action: () => this.buy( npc, up ) };
+
+		} );
+		choices.push( { key: 'KeyQ', label: 'Q · that’s all' } );
+		this.dialogue.open( npc.name, [ line || `What'll it be? You've got ${ this.save.credits } ✦ to spend.` ], choices );
+
+	}
+
+	buy( npc, up ) {
+
+		const level = this.save.level( up.id ), next = up.tiers[ level ];
+		let line;
+		if ( ! next ) line = "That's as good as she gets. Anything else?";
+		else if ( ! this.save.spend( next.cost ) ) line = `That's ${ next.cost } ✦ and you've got ${ this.save.credits }. Go earn some more.`;
+		else {
+
+			this.save.setLevel( up.id, level + 1 );
+			applyUpgrades( this.save.data.upgrades );
+			this.tweaks.gui.controllersRecursive().forEach( ( c ) => c.updateDisplay() );
+			this.toast( `${ tierName( up, level + 1 ) } fitted` );
+			line = `${ tierName( up, level + 1 ) }, fitted. You'll feel it. Anything else?`;
+
+		}
+		this.openShop( npc, line );
 
 	}
 

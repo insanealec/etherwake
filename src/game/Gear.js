@@ -1,4 +1,5 @@
-// Gear data tables. Milestone 5 adds upgrade tiers; for now one starter board.
+// Gear data tables: the starter board (BOARD) and the shipwright's upgrades (UPGRADES), which
+// modify BOARD's numbers.
 // Units: metres, seconds, radians.
 
 export const BOARD = {
@@ -24,3 +25,58 @@ export const BOARD = {
 	sketchyKeep: 0.75, // fraction of speed kept after a sketchy landing
 	wipeoutTime: 1.6 // seconds tumbling before you're back on the board
 };
+
+// The starter board's numbers, kept so upgrades can be re-applied from scratch.
+export const BASE_BOARD = { ...BOARD };
+
+// The shipwright's upgrades: each line has tiers; buying tier n sets the listed BOARD numbers.
+export const UPGRADES = [
+	{
+		id: 'sail', name: 'Sail canvas', blurb: 'more push from the solar wind',
+		tiers: [
+			{ cost: 80, set: { thrust: 7.2 } },
+			{ cost: 200, set: { thrust: 8.6 } },
+			{ cost: 450, set: { thrust: 10 } }
+		]
+	},
+	{
+		id: 'hull', name: 'Hull polish', blurb: 'less drag, higher top speed',
+		tiers: [
+			{ cost: 100, set: { dragQuad: 0.0105 } },
+			{ cost: 250, set: { dragQuad: 0.009 } },
+			{ cost: 500, set: { dragQuad: 0.0078 } }
+		]
+	},
+	{
+		id: 'rails', name: 'Grip rails', blurb: 'carve harder, slip less',
+		tiers: [
+			{ cost: 60, set: { grip: 8.5, turnRate: 1.9 } },
+			{ cost: 150, set: { grip: 10, turnRate: 2.1 } },
+			{ cost: 350, set: { grip: 12, turnRate: 2.3 } }
+		]
+	},
+	{
+		id: 'springs', name: 'Pop springs', blurb: 'bigger jumps',
+		tiers: [
+			{ cost: 90, set: { jump: 7.5, maxLaunch: 16.5 } },
+			{ cost: 220, set: { jump: 8.5, maxLaunch: 18 } },
+			{ cost: 480, set: { jump: 9.5, maxLaunch: 20 } }
+		]
+	}
+];
+
+const ROMAN = [ '', 'I', 'II', 'III' ];
+export const tierName = ( up, level ) => `${ up.name } ${ ROMAN[ level ] }`;
+
+// Reset BOARD to the starter numbers, then apply each owned upgrade tier. levels: { sail: 2, ... }
+export function applyUpgrades( levels ) {
+
+	Object.assign( BOARD, BASE_BOARD );
+	for ( const up of UPGRADES ) {
+
+		const level = levels[ up.id ] || 0;
+		if ( level > 0 ) Object.assign( BOARD, up.tiers[ level - 1 ].set );
+
+	}
+
+}
