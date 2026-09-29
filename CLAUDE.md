@@ -15,7 +15,8 @@ techniques that can be upgraded later.
 
 ## Commands
 - `npm run dev` starts the dev server on http://127.0.0.1:5190 (or `$PORT`, see `vite.config.js`). Use `preview_start` with name
-  `etherwake` (in `.claude/launch.json`).
+  `etherwake` (in `.claude/launch.json`): it's **pinned to port 5191** (`--strictPort`, no autoPort) because saves
+  live in localStorage per origin: a changing port gave the player an empty save each session.
 - `npm run build` does a static build into `dist/`.
 
 ## Code conventions

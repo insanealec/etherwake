@@ -180,6 +180,10 @@
   only; call it first in every test script; see CLAUDE.md); `Save` listens for the `storage` event and
   adopts another tab's newer save (`onExternal` re-applies upgrades). The stored `etherwake.noAudio` flag
   is no longer used in the pane (it muted the user's game too); navigate with `?noAudio` instead.
+  Second cause found: the preview got a new port every session (5190 is held by an old orphaned Vite,
+  PID 46888), and localStorage is per origin, so each new port meant an empty save. The preview is now
+  pinned to 5191 (`.claude/launch.json`: `--port 5191 --strictPort`, autoPort off). Granted the user
+  500 credits there to make up for lost progress.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
