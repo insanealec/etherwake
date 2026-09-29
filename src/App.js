@@ -167,7 +167,7 @@ export class App {
 		this.hudHint = {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
-			helm: 'A/D steer · W/S raise/lower sails · E leave the helm · F fly · M mute · H tweaks',
+			helm: 'A/D steer · W raise sails · S lower sails · E leave the helm · F fly · M mute · H tweaks',
 			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · M mute · H tweaks'
 		}[ mode ];
 
@@ -689,7 +689,7 @@ export class App {
 		const s = this.surfer, sail = s.sailState;
 		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
 		const G = this.galleon;
-		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
+		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ '▰'.repeat( Math.round( G.sail * 5 ) ) }${ '▱'.repeat( 5 - Math.round( G.sail * 5 ) ) } ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}

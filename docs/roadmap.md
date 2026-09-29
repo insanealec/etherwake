@@ -142,6 +142,11 @@
   E leaves the helm: sails furl, she coasts to a stop; her pose is saved (`save.data.galleon`, every 5 s at
   the helm too) and restored on load. Docking onto her needs matched speed (relative < 8 m/s); dropping in
   under way keeps her velocity. HUD at the helm: speed, sails %, point of sail.
+  User feedback: "drives like the little sailboat", raising/lowering sails "doesn't do anything", "real
+  slow". Now: `SHIP` thrust 3.0 / drag 0.02 / dragQuad 0.003: ~30 m/s on a beam reach, ~25 running, ~9 s
+  to 20 m/s (heavy but fast, for crossing distance). The sails visibly reef: hung from yards, they drop
+  as you raise them and pull up to a strip when furled, the wings fold in, and the glow scales with the
+  canvas out (`sailShown`, `uSailGlow`). HUD sail gauge (5 blocks + %).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

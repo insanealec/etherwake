@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, positionWorld, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
+import { Fn, uniform, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, positionWorld, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
 import { GALLEON, HARBOR } from './WorldLayout.js';
 import { RING_OUT } from './Port.js';
 import { sailPower } from './Wind.js';
@@ -16,9 +16,10 @@ export const SHIP = {
 	freeboard: 3.4, // deck height above the mean surface under the hull
 	response: 1.6, // how fast it follows the swell (1/s): heavier = slower
 	// sailing (at the helm)
-	thrust: 2.2, // push at full sail, times the point-of-sail efficiency: ~14 m/s top speed
-	drag: 0.05, // linear drag (1/s)
-	dragQuad: 0.008, // quadratic drag (1/m)
+	thrust: 3.0, // push at full sail, times the point-of-sail efficiency: ~30 m/s on a beam reach,
+	// ~26 running; heavy: about 8 s from a standstill to 20 m/s
+	drag: 0.02, // linear drag (1/s)
+	dragQuad: 0.003, // quadratic drag (1/m)
 	keel: 1.5, // how fast sideways drift is killed (1/s)
 	turnRate: 0.35, // rudder turn rate at speed (rad/s)
 	turnSpeed: 6, // below this speed the rudder has less bite
@@ -243,13 +244,14 @@ export class Galleon {
 		const windowGlow = new THREE.MeshBasicNodeMaterial( { color: new THREE.Color( 2.4, 1.2, 0.4 ) } );
 		// solar sails: saturated gold, glowing brightest in the middle, with brass ribs; see-through
 		const sail = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, transparent: true, depthWrite: false, opacity: 0.85, fog: false } );
+		this.uSailGlow = uniform( 0 );
 		sail.colorNode = Fn( () => {
 
 			const u = uv();
 			const ribs = smoothstep( 0.06, 0.0, abs( fract( u.x.mul( 6.0 ) ).sub( 0.5 ) ) );
 			const core = sin( u.x.mul( Math.PI ) ).mul( sin( u.y.mul( Math.PI ) ) );
 			const glow = vec3( 1.0, 0.3, 0.04 ).mul( core.mul( 1.6 ).add( 0.25 ) );
-			return mix( glow, vec3( 0.55, 0.32, 0.1 ), ribs.mul( 0.8 ) );
+			return mix( glow, vec3( 0.55, 0.32, 0.1 ), ribs.mul( 0.8 ) ).mul( this.uSailGlow.mul( 0.75 ).add( 0.25 ) ); // brighter with more canvas out
 
 		} )();
 
@@ -265,6 +267,8 @@ export class Galleon {
 		castle.position.set( 0, 1.8, - HALF + 5 );
 		g.add( castle );
 		this.solid = [ hull, castle ];
+		this.sailMeshes = [];
+		this.wingPivots = [];
 
 		// the helm: a ship's wheel on a post just forward of the stern castle
 		const helm = new THREE.Group();
@@ -305,8 +309,14 @@ export class Galleon {
 			mast.position.set( 0, h / 2, z );
 			g.add( mast );
 			this.solid.push( mast );
-			const s = new THREE.Mesh( sailGeometry( sw, sh, 1.2 ), sail );
-			s.position.set( 0, h * 0.55, z + 0.4 );
+			// hung from its yard (top edge), so scaling it vertically raises and lowers it
+			const s = new THREE.Mesh( sailGeometry( sw, sh, 1.2 ).translate( 0, - sh / 2, 0 ), sail );
+			s.position.set( 0, h * 0.55 + sh / 2, z + 0.4 );
+			const yard = new THREE.Mesh( new THREE.CylinderGeometry( 0.1, 0.1, sw + 1, 8 ), wood );
+			yard.rotation.z = Math.PI / 2;
+			yard.position.set( 0, h * 0.55 + sh / 2, z + 0.3 );
+			g.add( yard );
+			this.sailMeshes.push( s );
 			g.add( s );
 			const top = new THREE.Mesh( new THREE.SphereGeometry( 0.45, 12, 8 ), glow );
 			top.position.set( 0, h + 0.4, z );
@@ -333,6 +343,7 @@ export class Galleon {
 			pivot.position.set( side * W * 0.9, 1.2, - 1 );
 			pivot.rotation.z = side * 0.35; // tilt up
 			pivot.add( wing );
+			this.wingPivots.push( pivot );
 			g.add( pivot );
 
 		}
@@ -386,6 +397,13 @@ export class Galleon {
 		this.time += dt;
 		if ( helm ) this.sail = Math.max( 0, Math.min( 1, this.sail + ( helm.sail || 0 ) * SHIP.sailRate * dt ) );
 		this.sailing( dt, helm ? helm.steer || 0 : 0 );
+
+		// the sails show how much canvas is out: they drop from the yards, the wings unfold, the glow rises
+		this.sailShown = ( this.sailShown ?? this.sail ) + ( this.sail - ( this.sailShown ?? this.sail ) ) * ( 1 - Math.exp( - 3 * dt ) );
+		const k = this.sailShown;
+		for ( const m of this.sailMeshes ) m.scale.y = 0.08 + 0.92 * k;
+		for ( const p of this.wingPivots ) p.scale.x = 0.15 + 0.85 * k;
+		this.uSailGlow.value = k;
 		this.float( dt );
 		this.group.updateMatrixWorld();
 
