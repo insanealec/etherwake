@@ -8,7 +8,7 @@ import { HARBOR } from './WorldLayout.js';
 // launch anywhere around the boardwalk's outer edge. The ring is a circle collider that stops the board.
 export const DECK_Y = 2.0; // deck height above the calm harbour surface
 const RING_IN = 42;
-const RING_OUT = 54;
+export const RING_OUT = 54;
 const BOARD_R = 0.7; // board collision radius
 
 export class Port {

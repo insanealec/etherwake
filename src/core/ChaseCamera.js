@@ -1,11 +1,15 @@
 import { Vector3 } from 'three/webgpu';
 
-const DISTANCE = 9; // behind the board (m)
-const HEIGHT = 3.2; // above the board (m)
-const LOOK_AHEAD = 7; // look this far past the board along its heading
-const FOLLOW = 4.5; // position spring rate (1/s)
-const AIM = 9; // look-target spring rate (1/s)
-const CLEARANCE = 1.5; // keep this far above the sea
+// defaults for the board; the galleon passes bigger numbers
+const DEFAULTS = {
+	distance: 9, // behind the target (m)
+	height: 3.2, // above the target (m)
+	lookAhead: 7, // look this far past the target along its heading
+	lookUp: 1.2, // aim this far above the target
+	follow: 4.5, // position spring rate (1/s)
+	aim: 9, // look-target spring rate (1/s)
+	clearance: 1.5 // keep this far above the sea
+};
 
 const _target = new Vector3();
 const _fwd = new Vector3();
@@ -13,8 +17,10 @@ const _fwd = new Vector3();
 // Spring-damped chase camera behind the surfer; dips on hard landings.
 export class ChaseCamera {
 
-	constructor( camera, sea ) {
+	// target: anything with position, velocity, speed and forward() (the surfer, the galleon)
+	constructor( camera, sea, options = {} ) {
 
+		this.o = { ...DEFAULTS, ...options };
 		this.camera = camera;
 		this.sea = sea;
 		this.look = new Vector3();
@@ -46,7 +52,7 @@ export class ChaseCamera {
 		this.heading.lerp( _fwd, 1 - Math.exp( - 3 * dt ) ).normalize();
 
 		this.dip *= Math.exp( - 4 * dt );
-		this.place( surfer, 1 - Math.exp( - FOLLOW * dt ), 1 - Math.exp( - AIM * dt ) );
+		this.place( surfer, 1 - Math.exp( - this.o.follow * dt ), 1 - Math.exp( - this.o.aim * dt ) );
 
 	}
 
@@ -55,14 +61,14 @@ export class ChaseCamera {
 		const { camera, heading } = this;
 		const p = surfer.position;
 
-		_target.copy( p ).addScaledVector( heading, - DISTANCE );
-		_target.y += HEIGHT - this.dip;
+		_target.copy( p ).addScaledVector( heading, - this.o.distance );
+		_target.y += this.o.height - this.dip;
 		camera.position.lerp( _target, kPos );
-		const floor = this.sea.heightAt( camera.position.x, camera.position.z ) + CLEARANCE;
+		const floor = this.sea.heightAt( camera.position.x, camera.position.z ) + this.o.clearance;
 		if ( camera.position.y < floor ) camera.position.y = floor;
 
-		_target.copy( p ).addScaledVector( heading, LOOK_AHEAD );
-		_target.y += 1.2;
+		_target.copy( p ).addScaledVector( heading, this.o.lookAhead );
+		_target.y += this.o.lookUp;
 		this.look.lerp( _target, kLook );
 		camera.lookAt( this.look );
 

@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { Fn, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, positionWorld, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
-import { GALLEON } from './WorldLayout.js';
+import { GALLEON, HARBOR } from './WorldLayout.js';
+import { RING_OUT } from './Port.js';
+import { sailPower } from './Wind.js';
 import { buildFigure } from '../player/Figure.js';
 
 // The solar galleon (milestone 7), procedural first pass in a Treasure Planet-like spirit (our own
@@ -12,13 +14,24 @@ export const SHIP = {
 	beam: 9,
 	depth: 6,
 	freeboard: 3.4, // deck height above the mean surface under the hull
-	response: 1.6 // how fast it follows the swell (1/s): heavier = slower
+	response: 1.6, // how fast it follows the swell (1/s): heavier = slower
+	// sailing (at the helm)
+	thrust: 2.2, // push at full sail, times the point-of-sail efficiency: ~14 m/s top speed
+	drag: 0.05, // linear drag (1/s)
+	dragQuad: 0.008, // quadratic drag (1/m)
+	keel: 1.5, // how fast sideways drift is killed (1/s)
+	turnRate: 0.35, // rudder turn rate at speed (rad/s)
+	turnSpeed: 6, // below this speed the rudder has less bite
+	slope: 0.25, // how much the swell's slope pushes the ship
+	sailRate: 0.5 // how fast W/S raise and lower the sails (fraction per second)
 };
 
 const HALF = SHIP.length / 2, W = SHIP.beam / 2;
 const DECK = 0.4; // deck surface height in ship coordinates
 const CASTLE_FRONT = - HALF + 9; // the stern castle spans from here back to the stern
 const MASTS = [ 6, - 3 ]; // mast positions along the ship (z)
+const HELM_Z = CASTLE_FRONT + 1.5; // the wheel
+export const HELM_SPOT = { x: 0, z: CASTLE_FRONT + 0.7 }; // where the helmsman stands (ship coordinates)
 const smooth = ( a, b, x ) => {
 
 	const t = Math.max( 0, Math.min( 1, ( x - a ) / ( b - a ) ) );
@@ -104,17 +117,22 @@ function sailGeometry( w, h, belly ) {
 
 export class Galleon {
 
-	constructor( scene, sea ) {
+	// pose: where she was left last time (saved), else her anchorage from WorldLayout
+	constructor( scene, sea, pose = GALLEON ) {
 
 		this.sea = sea;
 		this.time = 0;
 		this.group = new THREE.Group();
 		this.group.rotation.order = 'YXZ';
-		this.group.position.set( GALLEON.x, 0, GALLEON.z );
-		this.group.rotation.y = GALLEON.yaw;
+		this.group.position.set( pose.x, 0, pose.z );
+		this.group.rotation.y = pose.yaw;
 		this.pitch = 0;
 		this.roll = 0;
 		this.lift = 0;
+		this.velocity = new THREE.Vector3(); // horizontal, while sailing or coasting
+		this.sail = 0; // sails raised, 0..1
+		this.wheel = 0; // smoothed rudder, for spinning the wheel
+		this.sailState = {};
 		scene.add( this.group );
 		this.build();
 		this.float( 1, true );
@@ -148,6 +166,7 @@ export class Galleon {
 		if ( Math.abs( lx ) > halfWidth( t ) * 0.94 - 0.55 ) return false;
 		if ( lz < CASTLE_FRONT && Math.abs( lx ) < 3.9 ) return false;
 		for ( const mz of MASTS ) if ( Math.hypot( lx, lz - mz ) < 0.7 ) return false;
+		if ( Math.hypot( lx, lz - HELM_Z ) < 0.55 ) return false; // the wheel's post
 		return true;
 
 	}
@@ -246,6 +265,24 @@ export class Galleon {
 		castle.position.set( 0, 1.8, - HALF + 5 );
 		g.add( castle );
 		this.solid = [ hull, castle ];
+
+		// the helm: a ship's wheel on a post just forward of the stern castle
+		const helm = new THREE.Group();
+		helm.position.set( 0, DECK, HELM_Z );
+		const post = new THREE.Mesh( new THREE.CylinderGeometry( 0.08, 0.1, 1.1, 8 ), brass );
+		post.position.y = 0.55;
+		this.wheelMesh = new THREE.Group();
+		this.wheelMesh.position.y = 1.15;
+		this.wheelMesh.add( new THREE.Mesh( new THREE.TorusGeometry( 0.45, 0.04, 6, 24 ), brass ) );
+		for ( let i = 0; i < 4; i ++ ) {
+
+			const spoke = new THREE.Mesh( new THREE.CylinderGeometry( 0.025, 0.025, 1.2, 5 ), brass );
+			spoke.rotation.z = i * Math.PI / 4;
+			this.wheelMesh.add( spoke );
+
+		}
+		helm.add( post, this.wheelMesh );
+		g.add( helm );
 		for ( let i = 0; i < 4; i ++ ) {
 
 			const win = new THREE.Mesh( new THREE.PlaneGeometry( 0.9, 0.7 ), windowGlow );
@@ -343,11 +380,86 @@ export class Galleon {
 
 	}
 
-	update( dt ) {
+	// helm: { steer: -1..1 (right positive), sail: -1..1 (raise / lower) } while someone's at the helm, else null
+	update( dt, helm = null ) {
 
 		this.time += dt;
+		if ( helm ) this.sail = Math.max( 0, Math.min( 1, this.sail + ( helm.sail || 0 ) * SHIP.sailRate * dt ) );
+		this.sailing( dt, helm ? helm.steer || 0 : 0 );
 		this.float( dt );
 		this.group.updateMatrixWorld();
+
+	}
+
+	get speed() {
+
+		return Math.hypot( this.velocity.x, this.velocity.z );
+
+	}
+
+	forward( target = new THREE.Vector3() ) {
+
+		const y = this.group.rotation.y;
+		return target.set( Math.sin( y ), 0, Math.cos( y ) );
+
+	}
+
+	get position() {
+
+		return this.group.position;
+
+	}
+
+	// The solar wind in the sails, a keel against drift, a rudder that needs way on, and a little push
+	// from the swell's slope; the ship can't sail into the harbour ring.
+	sailing( dt, steer ) {
+
+		const S = SHIP, g = this.group, v = this.velocity;
+		const speed = this.speed;
+		this.wheel += ( steer - this.wheel ) * ( 1 - Math.exp( - 4 * dt ) );
+		this.wheelMesh.rotation.z = - this.wheel * 2.5;
+		g.rotation.y -= this.wheel * S.turnRate * Math.min( 1, 0.15 + speed / S.turnSpeed ) * dt;
+
+		const fx = Math.sin( g.rotation.y ), fz = Math.cos( g.rotation.y );
+		const push = S.thrust * sailPower( g.rotation.y, this.sailState ).efficiency * this.sail;
+		const n = this.sea.normalAt( g.position.x, g.position.z );
+		v.x += ( fx * push + n.x * 12 * S.slope ) * dt;
+		v.z += ( fz * push + n.z * 12 * S.slope ) * dt;
+
+		// keel: bleed sideways drift; drag on the rest
+		const fwd = v.x * fx + v.z * fz;
+		const keep = Math.exp( - S.keel * dt );
+		const latX = ( v.x - fx * fwd ) * keep, latZ = ( v.z - fz * fwd ) * keep;
+		const fwd2 = fwd * Math.max( 0, 1 - ( S.drag + S.dragQuad * Math.abs( fwd ) ) * dt );
+		v.x = fx * fwd2 + latX;
+		v.z = fz * fwd2 + latZ;
+		g.position.x += v.x * dt;
+		g.position.z += v.z * dt;
+
+		// keep clear of the harbour ring
+		const dx = g.position.x - HARBOR.x, dz = g.position.z - HARBOR.z, d = Math.hypot( dx, dz ), min = RING_OUT + HALF;
+		if ( d < min && d > 1e-3 ) {
+
+			const nx = dx / d, nz = dz / d;
+			g.position.x += nx * ( min - d );
+			g.position.z += nz * ( min - d );
+			const into = v.x * nx + v.z * nz;
+			if ( into < 0 ) {
+
+				v.x -= nx * into;
+				v.z -= nz * into;
+
+			}
+
+		}
+
+	}
+
+	// where she lies, for saving
+	get pose() {
+
+		const p = this.group.position;
+		return { x: + p.x.toFixed( 1 ), z: + p.z.toFixed( 1 ), yaw: + this.group.rotation.y.toFixed( 3 ) };
 
 	}
 

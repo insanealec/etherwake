@@ -65,6 +65,11 @@ export const UPGRADES = [
 	}
 ];
 
+// Big purchases from the shipwright
+export const DEEDS = {
+	galleon: { name: 'Deed to the solar galleon', cost: 500 }
+};
+
 const ROMAN = [ '', 'I', 'II', 'III' ];
 export const tierName = ( up, level ) => `${ up.name } ${ ROMAN[ level ] }`;
 

@@ -23,13 +23,13 @@ import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Leviathans } from './world/Leviathans.js';
-import { Galleon } from './world/Galleon.js';
+import { Galleon, HELM_SPOT } from './world/Galleon.js';
 import { Audio } from './audio/Audio.js';
 import { WhaleSong } from './audio/WhaleSong.js';
 import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
-import { UPGRADES, applyUpgrades, tierName } from './game/Gear.js';
+import { UPGRADES, DEEDS, applyUpgrades, tierName } from './game/Gear.js';
 import { SPAWN } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
@@ -103,7 +103,8 @@ export class App {
 		this.promptEl = document.getElementById( 'prompt' );
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.leviathans = new Leviathans( this.scene, this.sea );
-		this.galleon = new Galleon( this.scene, this.sea );
+		this.galleon = new Galleon( this.scene, this.sea, this.save.data.galleon );
+		this.shipCam = new ChaseCamera( this.camera, this.sea, { distance: 42, height: 16, lookAhead: 25, lookUp: 6, follow: 2.5, aim: 5, clearance: 4 } );
 		this.walkCam.obstacles = [ ...this.port.cameraObstacles, ...this.galleon.cameraObstacles ];
 		this.song = new WhaleSong( this.audio, this.leviathans );
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
@@ -155,16 +156,18 @@ export class App {
 
 		if ( mode === 'fly' && this.mode !== 'fly' ) this.returnMode = this.mode || 'surf';
 		this.mode = mode;
-		this.onFoot = mode === 'walk' || ( mode === 'fly' && this.returnMode === 'walk' );
+		this.onFoot = mode === 'walk' || mode === 'helm' || ( mode === 'fly' && ( this.returnMode === 'walk' || this.returnMode === 'helm' ) );
 		this.walker.visible = this.onFoot;
 		this.surfer.riderVisible = ! this.onFoot;
 		this.fly.enabled = mode === 'fly';
 		if ( mode === 'fly' ) this.fly.euler.setFromQuaternion( this.camera.quaternion );
 		else if ( mode === 'walk' ) this.walkCam.snap( this.walker );
+		else if ( mode === 'helm' ) this.shipCam.snap( this.galleon );
 		else this.chase.snap( this.surfer );
 		this.hudHint = {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
+			helm: 'A/D steer · W/S raise/lower sails · E leave the helm · F fly · M mute · H tweaks',
 			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · M mute · H tweaks'
 		}[ mode ];
 
@@ -186,6 +189,8 @@ export class App {
 	launch( edge ) {
 
 		this.surfer.reset( edge.x, edge.z, edge.yaw );
+		// off a ship under way: you keep her speed
+		if ( this.walker.platform === this.galleon.platform ) this.surfer.velocity.add( this.galleon.velocity );
 		this.setMode( 'surf' );
 
 	}
@@ -231,7 +236,9 @@ export class App {
 		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
 		this.leviathans.update( dt );
-		this.galleon.update( dt );
+		const helm = this.mode === 'helm' && ! this.dialogue.active;
+		this.galleon.update( dt, helm ? { steer: key( 'KeyD' ) - key( 'KeyA' ), sail: key( 'KeyW' ) - key( 'KeyS' ) } : null );
+		if ( this.mode === 'helm' && this.time > ( this.poseSavedAt || 0 ) + 5 ) this.saveShipPose();
 		if ( this.onFoot ) this.walker.sync(); // the deck may have moved under you
 		this.song.update( dt, this.camera.position );
 		this.audio.update( this.camera );
@@ -260,6 +267,7 @@ export class App {
 
 		if ( surf ) this.chase.update( dt, this.surfer );
 		else if ( walk ) this.walkCam.update( dt, this.walker );
+		else if ( this.mode === 'helm' ) this.shipCam.update( dt, this.galleon );
 		else this.fly.update( dt );
 
 		this.giant.update( this.time, this.camera );
@@ -288,12 +296,15 @@ export class App {
 
 			} else if ( e || input.wasPressed( 'Space' ) ) this.dialogue.next();
 
-		} else if ( this.mode === 'surf' && this.surfer.grounded && this.surfer.speed < 10 ) {
+		} else if ( this.mode === 'surf' && this.surfer.grounded ) {
 
 			// slow near a mooring buoy: talk from the board; near any deck edge: step up
 			const s = this.surfer;
-			const npc = this.npcs.nearestMooring( s.position );
-			const spot = npc ? null : this.port.dockPoint( s.position.x, s.position.z ) || this.galleon.dockPoint( s.position.x, s.position.z );
+			// slow for the port; matching speed for the galleon (she may be under way)
+			const slow = s.speed < 10;
+			const matched = Math.hypot( s.velocity.x - this.galleon.velocity.x, s.velocity.z - this.galleon.velocity.z ) < 8;
+			const npc = slow ? this.npcs.nearestMooring( s.position ) : null;
+			const spot = npc ? null : ( slow && this.port.dockPoint( s.position.x, s.position.z ) ) || ( matched && this.galleon.dockPoint( s.position.x, s.position.z ) );
 			if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
@@ -312,8 +323,23 @@ export class App {
 			const onShip = wk.platform === this.galleon.platform;
 			const npc = onShip ? null : this.npcs.nearest( w );
 			const crew = onShip && this.galleon.crewPosition().distanceTo( w ) < 2.8;
-			const edge = npc || crew ? null : wk.platform.launchEdge( wk.local.x, wk.local.z );
-			if ( npc ) {
+			const atHelm = onShip && Math.hypot( wk.local.x - HELM_SPOT.x, wk.local.z - HELM_SPOT.z ) < 1.6;
+			const edge = npc || crew || atHelm ? null : wk.platform.launchEdge( wk.local.x, wk.local.z );
+			if ( atHelm ) {
+
+				if ( this.save.data.ownsGalleon ) {
+
+					prompt = 'E · take the helm';
+					if ( e ) {
+
+						wk.place( this.galleon.platform, HELM_SPOT.x, HELM_SPOT.z, 0 );
+						this.setMode( 'helm' );
+
+					}
+
+				} else prompt = 'The helm is lashed · the shipwright holds her deed';
+
+			} else if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
 				if ( e ) this.talkTo( npc );
@@ -321,7 +347,7 @@ export class App {
 			} else if ( crew ) {
 
 				prompt = 'E · talk to the quartermaster';
-				if ( e ) this.dialogue.open( QUARTERMASTER.name, QUARTERMASTER.lines );
+				if ( e ) this.dialogue.open( QUARTERMASTER.name, this.save.data.ownsGalleon ? QUARTERMASTER.ownedLines : QUARTERMASTER.lines );
 
 			} else if ( edge ) {
 
@@ -329,6 +355,13 @@ export class App {
 				if ( e ) this.launch( edge );
 
 			}
+
+		} else if ( this.mode === 'helm' && e ) {
+
+			// leave the helm: the sails furl and she coasts to a stop
+			this.galleon.sail = 0;
+			this.saveShipPose();
+			this.setMode( 'walk' );
 
 		}
 		if ( this.dialogue.active ) prompt = '';
@@ -389,8 +422,40 @@ export class App {
 			return { key: `Digit${ i + 1 }`, label, action: () => this.buy( npc, up ) };
 
 		} );
+		if ( ! this.save.data.ownsGalleon ) {
+
+			const d = DEEDS.galleon;
+			choices.push( { key: 'Digit5', label: `5 · ${ d.name } · ${ d.cost } ✦`, action: () => this.buyDeed( npc ) } );
+
+		}
 		choices.push( { key: 'KeyQ', label: 'Q · that’s all' } );
 		this.dialogue.open( npc.name, [ line || `What'll it be? You've got ${ this.save.credits } ✦ to spend.` ], choices );
+
+	}
+
+	buyDeed( npc ) {
+
+		const d = DEEDS.galleon;
+		let line;
+		if ( ! this.save.spend( d.cost ) ) line = `She's ${ d.cost } ✦ and you've got ${ this.save.credits }. She'll wait for you.`;
+		else {
+
+			this.save.data.ownsGalleon = true;
+			this.save.changed();
+			this.toast( 'The solar galleon is yours!' );
+			line = "Signed and sealed. She's anchored north, past the whales. Take the helm and she'll sail where you point her.";
+
+		}
+		this.openShop( npc, line );
+
+	}
+
+	// remember where the galleon lies, so she's there next time
+	saveShipPose() {
+
+		this.poseSavedAt = this.time;
+		this.save.data.galleon = this.galleon.pose;
+		this.save.changed();
 
 	}
 
@@ -623,7 +688,8 @@ export class App {
 
 		const s = this.surfer, sail = s.sailState;
 		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
-		const text = this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
+		const G = this.galleon;
+		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}

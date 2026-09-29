@@ -8,6 +8,11 @@ export const QUARTERMASTER = {
 		'Ahoy, and mind the wet planks. Welcome aboard the old courier galleon.',
 		'The captain\'s ashore and the helm stays lashed till the shipwright signs her over.',
 		'Till then, the deck\'s yours to wander. Drop in off either rail when you\'ve had your fill.'
+	],
+	// once you own her
+	ownedLines: [
+		'Captain! She\'s yours now, papers and all.',
+		'The helm\'s just forward of the stern castle. Raise the sails with W, lower them with S, and give her room to turn.'
 	]
 };
 

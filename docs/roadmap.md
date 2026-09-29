@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 7, the galleon (slices 1-2 done: at anchor, boarding and walking the deck). Milestone 6 done.
+- **Current milestone:** 7, the galleon (slices 1-3 done: at anchor, boarding, the helm). Milestone 6 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -132,6 +132,16 @@
   rail: over the side, heading away), `cameraObstacles` (hull, castle, masts; the walk camera uses port +
   ship obstacles). The **Quartermaster** (`QUARTERMASTER` in `game/Characters.js`) stands by the stern
   castle: the helm stays lashed "till the shipwright signs her over" (the hook for slice 3).
+- **Milestone 7 slice 3 (2026-09-29):** the helm. The user chose a big credit purchase: `DEEDS.galleon`
+  (500 credits, "for now") in `game/Gear.js`, option 5 in the shipwright's shop, saved as `ownsGalleon`;
+  the quartermaster's `ownedLines` then explain the helm. A ship's wheel just forward of the stern castle
+  (`HELM_SPOT`); E there takes the helm (mode `helm`, on foot at the wheel): A/D rudder (needs way on),
+  W/S raise/lower the sails (a setting, 0 to 100%), the solar wind drives her via `sailPower` like the
+  board (`SHIP` tuning: ~14 m/s at full sail on a beam reach; a keel kills drift; a little slope push);
+  she can't enter the harbour ring. A second `ChaseCamera` (now configurable) follows the ship from 42 m.
+  E leaves the helm: sails furl, she coasts to a stop; her pose is saved (`save.data.galleon`, every 5 s at
+  the helm too) and restored on load. Docking onto her needs matched speed (relative < 8 m/s); dropping in
+  under way keeps her velocity. HUD at the helm: speed, sails %, point of sail.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -195,12 +205,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 7 slice 3: **take the helm**. Get the galleon signed over (probably bought from or granted
-by the shipwright once you've earned enough, saved), a helm on the stern castle (steps up from the deck),
-E at the helm switches to a sailing mode: steer with A/D, sail with W, the solar wind drives it like the
-board (point of sail), heavier and slower, riding the swell; a chase camera behind the ship; the walker
-and the board ride along. Launch the board from the deck while under way. Later: regions to sail to
-(milestone 8).
+Get the user's play-test of buying and sailing the galleon (price, speed, turning, camera). Candidate
+polish: sails that visibly reef with the sail setting; a wake behind the ship; the ship's bow wave in the
+sea (like the leviathans'); an anchor toggle. Then **milestone 8+ (regions and polish)**: regions to sail
+to (the flare-storm zone, the gas giant's rings, the black hole rim), a title screen, performance work,
+and a GitHub Pages deploy.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
