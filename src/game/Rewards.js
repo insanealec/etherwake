@@ -10,7 +10,10 @@ export const REWARDS = {
 	sketchyFactor: 0.5, // sketchy landings pay this fraction
 	bow: 5, // riding a leviathan's bow wave: this much every `bowEvery` seconds on it
 	bowEvery: 4,
-	bowLift: 1.5 // metres the bow wave must lift the surface under you to count
+	bowLift: 1.5, // metres the bow wave must lift the surface under you to count
+	flare: 15, // riding a flare-front: this much every `flareEvery` seconds on its face
+	flareEvery: 3,
+	flareLift: 3 // metres the front must lift the surface under you to count
 };
 
 // Stardust trails scattered over the open sea (not in the harbour).

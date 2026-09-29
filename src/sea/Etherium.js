@@ -6,6 +6,7 @@ import {
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
 import { HARBOR } from '../world/WorldLayout.js';
+import { FLARES, FLARE_TINT } from '../game/Flares.js';
 
 // Harbour calm: swells shrink to HARBOR.calm near the port. Shared by the JS and TSL wave functions.
 const uHarbor = uniform( new THREE.Vector4( HARBOR.x, HARBOR.z, HARBOR.calmRadius, HARBOR.fadeRadius ) );
@@ -92,6 +93,61 @@ function bowHeight( p ) {
 
 }
 
+// Flare-fronts (milestone 8): one solitary wave (a sech² ridge) rolling across a region along `dir`,
+// faded out toward the region's edge. setFlareRegion() once, setFlare( s, H ) each frame (s: the
+// front's distance along dir from the region centre; H: its current height, 0 when there's none).
+const flareJS = { cx: 0, cz: 0, dx: 1, dz: 0, R: 1, s: 0, H: 0 };
+const uFlareA = uniform( new THREE.Vector4( 0, 0, 1, 0 ) ); // cx, cz, dx, dz
+const uFlareB = uniform( new THREE.Vector4( 0, 0, FLARES.width, 1 ) ); // s, H, width, R
+
+export function setFlareRegion( cx, cz, dx, dz, R ) {
+
+	Object.assign( flareJS, { cx, cz, dx, dz, R } );
+	uFlareA.value.set( cx, cz, dx, dz );
+	uFlareB.value.w = R;
+
+}
+
+export function setFlare( s, H ) {
+
+	flareJS.s = s;
+	flareJS.H = H;
+	uFlareB.value.x = s;
+	uFlareB.value.y = H;
+
+}
+
+function flareHeightJS( x, z ) {
+
+	const f = flareJS;
+	if ( f.H <= 0 ) return 0;
+	const lx = x - f.cx, lz = z - f.cz, r = Math.hypot( lx, lz );
+	if ( r >= f.R ) return 0;
+	const a = Math.abs( lx * f.dx + lz * f.dz - f.s ) / FLARES.width, e = Math.exp( - 2 * a );
+	const k = Math.min( 1, ( f.R - r ) / ( 0.3 * f.R ) ), fade = k * k * ( 3 - 2 * k );
+	return f.H * 4 * e / ( ( 1 + e ) * ( 1 + e ) ) * fade;
+
+}
+
+// how high the flare-front lifts the surface at (x, z)
+export const flareHeightAt = ( x, z ) => flareHeightJS( x, z );
+
+// TSL twin of flareHeightJS at point p (vec2)
+function flareHeight( p ) {
+
+	const l = p.sub( uFlareA.xy );
+	const a = dot( l, uFlareA.zw ).sub( uFlareB.x ).abs().div( uFlareB.z );
+	const e = a.mul( - 2 ).exp();
+	const sech2 = e.mul( 4 ).div( e.add( 1 ).mul( e.add( 1 ) ) );
+	const fade = smoothstep( uFlareB.w, uFlareB.w.mul( 0.7 ), length( l ) );
+	return uFlareB.y.mul( sech2 ).mul( fade );
+
+}
+
+// everything that lifts the sea on top of the swell: leviathan bow waves and flare-fronts
+const extraHeight = ( p ) => bowHeight( p ).add( flareHeight( p ) );
+const extraHeightJS = ( x, z ) => bowHeightJS( x, z ) + flareHeightJS( x, z );
+
 const TAU = Math.PI * 2;
 
 // Grid: a plane of HALF metres half-extent, remapped so vertices are dense near
@@ -164,11 +220,11 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 	}
 
 	// leviathan bow waves: height plus a finite-difference slope for the normal
-	const bh = bowHeight( p ).toVar();
+	const bh = extraHeight( p ).toVar();
 	const e = 0.6;
 	disp.y.addAssign( bh.mul( height ) );
-	tan.y.addAssign( bowHeight( p.add( vec2( e, 0 ) ) ).sub( bh ).div( e ).mul( height ) );
-	bin.y.addAssign( bowHeight( p.add( vec2( 0, e ) ) ).sub( bh ).div( e ).mul( height ) );
+	tan.y.addAssign( extraHeight( p.add( vec2( e, 0 ) ) ).sub( bh ).div( e ).mul( height ) );
+	bin.y.addAssign( extraHeight( p.add( vec2( 0, e ) ) ).sub( bh ).div( e ).mul( height ) );
 
 	return { disp, tan, bin, jacobian: tan.x.mul( bin.z ).sub( tan.z.mul( bin.x ) ) };
 
@@ -192,6 +248,9 @@ export class Etherium {
 		this.uFogColor = uniform( PALETTE.fogAbove.clone() );
 		this.uFogDensity = uniform( FOG.above );
 		this.uUnderwater = uniform( 0 );
+		this.uFlareMix = uniform( 0 ); // region atmosphere: 0 outside the Flare Reach, 1 inside
+		this.regionMix = 0;
+		this.regionFog = new THREE.Color( ...FLARE_TINT.fog );
 		this.uWaves = WAVES.map( () => ( { a: uniform( new THREE.Vector4() ), b: uniform( new THREE.Vector4() ) } ) );
 		this.refresh();
 
@@ -312,6 +371,10 @@ export class Etherium {
 			const puff = smoothstep( 0.65, 0.3, vJacobian ).mul( dens );
 			col.addAssign( hot.mul( puff ).mul( 0.7 ) );
 
+			// the Flare Reach runs hotter, and a flare-front's face glows like molten gold
+			col.assign( mix( col, col.mul( vec3( ...FLARE_TINT.sea ) ), this.uFlareMix ) );
+			col.addAssign( vec3( ...FLARE_TINT.glow ).mul( pow( flareHeight( P.xz ).div( FLARES.height ), 2 ) ).mul( 0.55 ) );
+
 			// back-lit gas: looking toward the sun, thin gas glows (a silver lining instead of a glint)
 			const back = pow( max( dot( V.negate(), L ), 0 ), 6 ).mul( dens );
 			col.addAssign( c( 'sun' ).mul( back ).mul( 0.9 ) );
@@ -347,10 +410,10 @@ export class Etherium {
 
 		}
 		// leviathan bow waves: height plus a finite-difference slope (matches etheriumWaves)
-		const bh = bowHeightJS( x, z ), e = 0.6;
+		const bh = extraHeightJS( x, z ), e = 0.6;
 		dy += bh * H;
-		ty += ( bowHeightJS( x + e, z ) - bh ) / e * H;
-		by += ( bowHeightJS( x, z + e ) - bh ) / e * H;
+		ty += ( extraHeightJS( x + e, z ) - bh ) / e * H;
+		by += ( extraHeightJS( x, z + e ) - bh ) / e * H;
 		out.dx = dx; out.dy = dy; out.dz = dz;
 		out.nx = by * tz - bz * ty; out.ny = bz * tx - bx * tz; out.nz = bx * ty - by * tx;
 		return out;
@@ -398,6 +461,8 @@ export class Etherium {
 
 		this.underwater = camera.position.y < this.heightAt( camera.position.x, camera.position.z );
 		this.uFogColor.value.copy( this.underwater ? PALETTE.fogBelow : PALETTE.fogAbove );
+		if ( this.regionMix > 0 && ! this.underwater ) this.uFogColor.value.lerp( this.regionFog, this.regionMix );
+		this.uFlareMix.value = this.regionMix;
 		this.uFogDensity.value = this.underwater ? FOG.below : FOG.above;
 		this.uUnderwater.value = this.underwater ? 1 : 0;
 

@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 7, the galleon (slices 1-3 done: at anchor, boarding, the helm). Milestone 6 done.
+- **Current milestone:** 8, regions and polish (slice 1 done: the Flare Reach). Milestone 7 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -147,6 +147,18 @@
   to 20 m/s (heavy but fast, for crossing distance). The sails visibly reef: hung from yards, they drop
   as you raise them and pull up to a strip when furled, the wings fold in, and the glow scales with the
   canvas out (`sailShown`, `uSailGlow`). HUD sail gauge (5 blocks + %).
+  Wording then changed to "W more sail / S less sail" (the user found "raise" backwards).
+- **Milestone 8 slice 1 (2026-09-29): the Flare Reach.** `REGIONS.flare` in `WorldLayout` (~4 km out
+  toward the sun, radius 750 m, fronts travel along `dir` away from the sun); tuning in
+  `src/game/Flares.js` (`FLARES`: every 95 s an 8 s warning then a 12 m front at 22 m/s; `FLARE_TINT`).
+  `Etherium.js`: `setFlareRegion` / `setFlare` and a sech² flare-front in both wave functions via
+  `extraHeight` (bow waves + flare, JS and TSL, finite-difference normals); the sea tints hotter by
+  `uFlareMix` and the front's face glows; the fog blends to ember inside (`regionMix`). `Starfield`
+  exports `uSunBoost` (the sun pulses during warnings and launches). `src/world/Regions.js`: the flare
+  cycle, atmosphere blend by distance, enter/leave/warning/launch events, a flickering ember column
+  (900 m, fog-free, fades up close) that sits under the sun seen from the harbour. App: toasts, and
+  riding a front pays +15 every 3 s (`REWARDS.flare*`). Holding W on the board you slowly outrun the
+  front (~23 vs 22 m/s), so holding its face means easing off.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -210,11 +222,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's play-test of buying and sailing the galleon (price, speed, turning, camera). Candidate
-polish: sails that visibly reef with the sail setting; a wake behind the ship; the ship's bow wave in the
-sea (like the leviathans'); an anchor toggle. Then **milestone 8+ (regions and polish)**: regions to sail
-to (the flare-storm zone, the gas giant's rings, the black hole rim), a title screen, performance work,
-and a GitHub Pages deploy.
+Get the user's play-test of the Flare Reach (front size, speed, frequency, reward, looks). Possible
+next: danger in the Reach (e.g. the front wipes you out if it catches you head-on, or heat that builds
+while you're in it), a dockmaster courier run or race out there, a hint about the Reach from an NPC.
+Then more regions: the gas giant's rings (ice slalom), the black hole rim (lensing); then a title screen,
+performance work and a GitHub Pages deploy.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

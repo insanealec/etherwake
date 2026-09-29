@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { pass } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
-import { Etherium, bowHeightAt } from './sea/Etherium.js';
+import { Etherium, bowHeightAt, flareHeightAt } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
 import { Moon } from './sky/Moon.js';
 import { SunFlare } from './post/SunFlare.js';
@@ -24,6 +24,7 @@ import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Leviathans } from './world/Leviathans.js';
 import { Galleon, HELM_SPOT } from './world/Galleon.js';
+import { Regions } from './world/Regions.js';
 import { Audio } from './audio/Audio.js';
 import { WhaleSong } from './audio/WhaleSong.js';
 import { Courier } from './game/Courier.js';
@@ -104,6 +105,7 @@ export class App {
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.leviathans = new Leviathans( this.scene, this.sea );
 		this.galleon = new Galleon( this.scene, this.sea, this.save.data.galleon );
+		this.regions = new Regions( this.scene, this.sea );
 		this.shipCam = new ChaseCamera( this.camera, this.sea, { distance: 42, height: 16, lookAhead: 25, lookUp: 6, follow: 2.5, aim: 5, clearance: 4 } );
 		this.walkCam.obstacles = [ ...this.port.cameraObstacles, ...this.galleon.cameraObstacles ];
 		this.song = new WhaleSong( this.audio, this.leviathans );
@@ -224,6 +226,7 @@ export class App {
 			this.leviathans.collide( this.surfer );
 			this.galleon.collide( this.surfer );
 			this.rideBowWave( dt );
+			this.rideFlare( dt );
 
 		}
 
@@ -243,6 +246,7 @@ export class App {
 		this.song.update( dt, this.camera.position );
 		this.audio.update( this.camera );
 		this.spotPod();
+		this.onRegion( this.regions.update( dt, this.camera.position ) );
 		this.spotGalleon();
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
@@ -565,6 +569,45 @@ export class App {
 			this.save.data.foundGalleon = true;
 			this.save.changed();
 			this.toast( 'The solar galleon!' );
+
+		}
+
+	}
+
+	onRegion( event ) {
+
+		const name = this.regions.flare.name;
+		if ( event === 'enter' ) {
+
+			this.toast( `Entering ${ name }` );
+			this.save.data.foundFlareReach = true;
+			this.save.changed();
+
+		} else if ( event === 'leave' ) this.toast( `Leaving ${ name }` );
+		else if ( event === 'warning' ) this.toast( 'A flare is building…' );
+		else if ( event === 'launch' ) this.toast( 'Flare-front! Ride it away from the sun' );
+
+	}
+
+	// Riding a flare-front (on the board, on its lifted face, moving): a big bonus every few seconds.
+	rideFlare( dt ) {
+
+		const s = this.surfer, p = s.position;
+		const riding = s.grounded && s.speed > 10 && flareHeightAt( p.x, p.z ) > REWARDS.flareLift;
+		this.flareGrace = riding ? 1 : Math.max( 0, ( this.flareGrace || 0 ) - dt );
+		if ( this.flareGrace <= 0 ) {
+
+			this.flareTime = 0;
+			return;
+
+		}
+		if ( riding ) this.flareTime = ( this.flareTime || 0 ) + dt;
+		if ( this.flareTime >= REWARDS.flareEvery ) {
+
+			this.flareTime -= REWARDS.flareEvery;
+			this.save.addCredits( REWARDS.flare );
+			this.save.stat( 'flareRides', ( n ) => n + 1 );
+			this.toast( `Riding the flare! · +${ REWARDS.flare } ✦` );
 
 		}
 

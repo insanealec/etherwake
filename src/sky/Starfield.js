@@ -1,9 +1,12 @@
-import { Fn, vec3, float, floor, fract, sin, dot, length, smoothstep, mix, pow, max, exp, select, positionWorldDirection, mx_fractal_noise_float } from 'three/tsl';
+import { Fn, uniform, vec3, float, floor, fract, sin, dot, length, smoothstep, mix, pow, max, exp, select, positionWorldDirection, mx_fractal_noise_float } from 'three/tsl';
 
 // cheap float hash of a 3D cell id -> [0,1)
 const hash3 = Fn( ( [ p ] ) => fract( sin( dot( p, vec3( 127.1, 311.7, 74.7 ) ) ).mul( 43758.5453 ) ) );
 
 // One layer of stars: the view direction is split into 3D cells, some cells get a star.
+// the sun's extra brightness: flares pulse it (world/Regions.js)
+export const uSunBoost = uniform( 0 );
+
 export const starLayer = Fn( ( [ dir, scale, density ] ) => {
 
 	const p = dir.mul( scale );
@@ -61,7 +64,7 @@ export class Starfield {
 				const disc = smoothstep( 0.99955, 0.9997, d ).mul( 30.0 ); // ~1.5 degrees across
 				const corona = pow( d, 900.0 ).mul( 2.5 );
 				const glow = pow( d, 18.0 ).mul( 0.18 ).add( pow( d, 4.0 ).mul( 0.025 ) );
-				sky.addAssign( vec3( 1.0, 0.72, 0.42 ).mul( disc.add( corona ) ).add( vec3( 1.0, 0.35, 0.15 ).mul( glow ) ) );
+				sky.addAssign( vec3( 1.0, 0.72, 0.42 ).mul( disc.add( corona ) ).add( vec3( 1.0, 0.35, 0.15 ).mul( glow ) ).mul( uSunBoost.add( 1 ) ) );
 
 			}
 			// below the horizon we're looking at the (fogged) sea beyond the grid edge
