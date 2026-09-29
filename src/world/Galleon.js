@@ -24,7 +24,7 @@ export const SHIP = {
 	turnRate: 0.35, // rudder turn rate at speed (rad/s)
 	turnSpeed: 6, // below this speed the rudder has less bite
 	slope: 0.25, // how much the swell's slope pushes the ship
-	sailRate: 0.5 // how fast W/S raise and lower the sails (fraction per second)
+	sailRate: 0.5 // how fast W/S let out and take in sail (fraction per second)
 };
 
 const HALF = SHIP.length / 2, W = SHIP.beam / 2;
@@ -131,7 +131,7 @@ export class Galleon {
 		this.roll = 0;
 		this.lift = 0;
 		this.velocity = new THREE.Vector3(); // horizontal, while sailing or coasting
-		this.sail = 0; // sails raised, 0..1
+		this.sail = 0; // how much sail is out, 0 (furled) .. 1 (full)
 		this.wheel = 0; // smoothed rudder, for spinning the wheel
 		this.sailState = {};
 		scene.add( this.group );
@@ -391,7 +391,7 @@ export class Galleon {
 
 	}
 
-	// helm: { steer: -1..1 (right positive), sail: -1..1 (raise / lower) } while someone's at the helm, else null
+	// helm: { steer: -1..1 (right positive), sail: -1..1 (more / less sail) } while someone's at the helm, else null
 	update( dt, helm = null ) {
 
 		this.time += dt;
