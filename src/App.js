@@ -218,6 +218,21 @@ export class App {
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
 		this.onRace( this.race.update( dt, this.surfer ) );
+		if ( this.race.boosted ) {
+
+			this.fovKick = 1;
+			this.spray.burst( this.surfer, 24 );
+
+		}
+		// boost: the field of view widens briefly and eases back
+		this.fovKick = ( this.fovKick || 0 ) * Math.exp( - 2.5 * dt );
+		const fov = 60 + this.fovKick * 14;
+		if ( Math.abs( fov - this.camera.fov ) > 0.01 ) {
+
+			this.camera.fov = fov;
+			this.camera.updateProjectionMatrix();
+
+		}
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
 

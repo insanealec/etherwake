@@ -68,7 +68,16 @@
   medal times; mid-race, talking offers to abandon. Finish pays 20, silver 40, gold 90, +15 for a new
   best; best times saved in `save.data.races`. The objective HUD shows the race (gate n/N, distance,
   running time) ahead of any courier job; starting a race abandons a courier job. Medal times set from a
-  straight-line autopilot run (loop ~75 s, crest ~127 s): gold 68 / 118, silver 85 / 150.
+  straight-line autopilot run.
+- **Races, round 2 (2026-09-28),** user: races "kinda meh", the triangle arrow was ambiguous. The
+  objective arrow is now a notched SVG arrow (no rotation transition, which spun the long way round).
+  Gate types in `COURSES` (`[ angle, distance, type ]`): **boost** gates (teal, centred at rider height
+  with a glowing sweet-spot disc: cross within 2.5 m of the centre for +9 m/s along your heading, a spray
+  burst and a field-of-view kick) and **air** gates (rose, ring bottom 1.5 m above the swell: any
+  ordinary jump clears it; the user asked not to need big waves). Gates now count when you cross their
+  plane going forward inside the ring (offset from the centre decides the boost). Per-type lifts in
+  `RACE.lift`. Medal times re-set from an autopilot that hits every boost and jumps every air gate
+  (loop ~68 s, crest ~125 s): gold 62 / 115, silver 76 / 140.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
