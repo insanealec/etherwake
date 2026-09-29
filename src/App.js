@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { pass } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
-import { Etherium } from './sea/Etherium.js';
+import { Etherium, bowHeightAt } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
 import { Moon } from './sky/Moon.js';
 import { SunFlare } from './post/SunFlare.js';
@@ -206,6 +206,8 @@ export class App {
 				jump: input.wasPressed( 'Space' )
 			} : {} );
 			this.port.collide( this.surfer );
+			this.leviathans.collide( this.surfer );
+			this.rideBowWave( dt );
 
 		}
 
@@ -445,6 +447,30 @@ export class App {
 			}
 			this.save.addCredits( pay );
 			this.toast( `${ c.name } · ${ formatTime( t ) }${ medal ? ` · ${ medal }!` : '' }${ best ? ' · new best' : '' } · +${ pay } ✦` );
+
+		}
+
+	}
+
+	// Riding a leviathan's bow wave (on the board, on its lifted surface): a small bonus every few seconds.
+	rideBowWave( dt ) {
+
+		const s = this.surfer, p = s.position;
+		const riding = s.grounded && s.speed > 6 && bowHeightAt( p.x, p.z ) > REWARDS.bowLift;
+		this.bowGrace = riding ? 1 : Math.max( 0, ( this.bowGrace || 0 ) - dt );
+		if ( this.bowGrace <= 0 ) {
+
+			this.bowTime = 0;
+			return;
+
+		}
+		if ( riding ) this.bowTime = ( this.bowTime || 0 ) + dt;
+		if ( this.bowTime >= REWARDS.bowEvery ) {
+
+			this.bowTime -= REWARDS.bowEvery;
+			this.save.addCredits( REWARDS.bow );
+			this.save.stat( 'bowRides', ( n ) => n + 1 );
+			this.toast( `Riding with the leviathans · +${ REWARDS.bow } ✦` );
 
 		}
 

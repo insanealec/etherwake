@@ -7,7 +7,10 @@ export const REWARDS = {
 	revert: 5,
 	airPerSecond: 4, // air time past `airFrom` seconds
 	airFrom: 1.5,
-	sketchyFactor: 0.5 // sketchy landings pay this fraction
+	sketchyFactor: 0.5, // sketchy landings pay this fraction
+	bow: 5, // riding a leviathan's bow wave: this much every `bowEvery` seconds on it
+	bowEvery: 4,
+	bowLift: 1.5 // metres the bow wave must lift the surface under you to count
 };
 
 // Stardust trails scattered over the open sea (not in the harbour).

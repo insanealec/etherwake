@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 6, leviathans (slice 1 done: star-whale pod swimming and breaching). Milestone 5 done.
+- **Current milestone:** 6, leviathans (slices 1-2 done: pod swimming and breaching, bow-wave riding). Milestone 5 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -92,6 +92,16 @@
   with backs breaking the gas, gently bobbing, and each breaches every 35 to 70 s (9 s arc, a third of a
   body length up, pitched to match). **Testing note:** the pane often hides; screenshots are stale then.
   Let the real loop run, place the fly camera, wait, then screenshot.
+- **Milestone 6 slice 2 (2026-09-28):** bow waves. `BOW` table and `setBowWave()` in `Etherium.js`: per
+  whale a smooth mound over and ahead of the head (0.1 body lengths high, so ~6.4 m for the lead) plus a
+  V-shaped wake (~19.5 degree arms, fading over 3 lengths), added to both `sampleGrid` (JS) and
+  `etheriumWaves` (TSL) with a finite-difference slope for the normal, so physics, sea, motes and shells
+  all ride them. `Leviathans.update` sets each whale's bow wave (fading while it breaches);
+  `Leviathans.collide` keeps the board out of the bodies (a capsule per spine, only at body height).
+  `App.rideBowWave`: on the board, grounded, over 6 m/s, on a surface lifted more than 1.5 m by a bow
+  wave: +5 credits every 4 s (`REWARDS.bow*`). Test: a board placed on the lead's bow face going 13 m/s
+  stayed with the whale for 12 s and earned the bonus. **Test gotcha:** `import()`-ing a module from the
+  console can load a second copy with separate state (e.g. `bowHeightAt` read 0); go through `__ew`.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -155,11 +165,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 6 slice 2: **ride the bow wave** (add a moving swell source ahead of and beside each whale to
-both wave functions, JS and TSL, so the surfer can catch it; maybe a breach splash ring that throws the
-board). Slice 3: **song** (the first audio: add `?noAudio` and use it for every automated run; WebAudio,
-procedural or a CC0 Freesound recording listed in `CREDITS.md`), plus a pod-sighting toast and maybe a
-bonus for riding with them.
+Milestone 6 slice 3: **song** (the first audio; add `?noAudio` and use it for every automated run;
+WebAudio, procedural synthesis or a CC0 Freesound recording listed in `CREDITS.md`; distance-based volume
+from the pod), a pod-sighting toast, maybe a breach splash ring. Then milestone 7 (the galleon).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

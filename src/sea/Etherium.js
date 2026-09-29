@@ -17,6 +17,81 @@ function harborCalm( x, z ) {
 
 }
 
+// Leviathan bow waves (milestone 6): moving swell sources set each frame by world/Leviathans.js via
+// setBowWave(). Each is a smooth mound over and ahead of a whale's head plus a V-shaped wake trailing
+// back from the bow, all scaled by the whale's length. Shared by the JS and TSL wave functions.
+export const BOW = {
+	count: 3,
+	moundAhead: 0.35, // mound centre ahead of the body centre (body lengths)
+	moundLength: 0.28, // mound size along and across travel (body lengths)
+	moundWidth: 0.5,
+	moundHeight: 0.1,
+	bowAt: 0.45, // where the wake arms start (ahead of the body centre)
+	armSpread: 0.35, // tan of the wake half-angle (~19.5 degrees)
+	armWidth: 0.1, // arm width at the bow (body lengths), growing 0.04 m per metre back
+	armHeight: 0.06,
+	armDecay: 3 // arms fade over this many body lengths
+};
+const bowJS = Array.from( { length: BOW.count }, () => ( { x: 0, z: 0, dx: 1, dz: 0, L: 1, s: 0 } ) );
+const uBow = Array.from( { length: BOW.count }, () => ( { a: uniform( new THREE.Vector4( 0, 0, 1, 0 ) ), b: uniform( new THREE.Vector4( 1, 0, 0, 0 ) ) } ) );
+
+export function setBowWave( i, x, z, dx, dz, length, strength ) {
+
+	Object.assign( bowJS[ i ], { x, z, dx, dz, L: length, s: strength } );
+	uBow[ i ].a.value.set( x, z, dx, dz );
+	uBow[ i ].b.value.set( length, strength, 0, 0 );
+
+}
+
+// how high the bow waves lift the surface at (x, z), e.g. to tell if the surfer is riding one
+export const bowHeightAt = ( x, z ) => bowHeightJS( x, z );
+
+function bowHeightJS( x, z ) {
+
+	let h = 0;
+	for ( const w of bowJS ) {
+
+		if ( w.s <= 0 ) continue;
+		const L = w.L, lx = x - w.x, lz = z - w.z;
+		const u = lx * w.dx + lz * w.dz, v = - lx * w.dz + lz * w.dx;
+		const mu = ( u - BOW.moundAhead * L ) / ( BOW.moundLength * L ), mv = v / ( BOW.moundWidth * L );
+		const mound = Math.exp( - mu * mu - mv * mv ) * BOW.moundHeight * L;
+		const s = BOW.bowAt * L - u;
+		if ( s > 0 ) {
+
+			const q = ( Math.abs( v ) - BOW.armSpread * s ) / ( BOW.armWidth * L + 0.04 * s );
+			const k = Math.min( 1, s / ( 0.4 * L ) );
+			h += Math.exp( - q * q - s / ( BOW.armDecay * L ) ) * k * k * ( 3 - 2 * k ) * BOW.armHeight * L * w.s;
+
+		}
+		h += mound * w.s;
+
+	}
+	return h;
+
+}
+
+// TSL twin of bowHeightJS at grid point p (vec2)
+function bowHeight( p ) {
+
+	let h = float( 0 );
+	for ( const { a, b } of uBow ) {
+
+		const L = b.x, st = b.y;
+		const l = p.sub( a.xy );
+		const u = l.x.mul( a.z ).add( l.y.mul( a.w ) ), v = l.y.mul( a.z ).sub( l.x.mul( a.w ) );
+		const mu = u.sub( L.mul( BOW.moundAhead ) ).div( L.mul( BOW.moundLength ) ), mv = v.div( L.mul( BOW.moundWidth ) );
+		const mound = mu.mul( mu ).add( mv.mul( mv ) ).negate().exp().mul( L.mul( BOW.moundHeight ) );
+		const s = L.mul( BOW.bowAt ).sub( u ).max( 0 ); // distance behind the bow (arms only exist behind it)
+		const q = v.abs().sub( s.mul( BOW.armSpread ) ).div( L.mul( BOW.armWidth ).add( s.mul( 0.04 ) ) );
+		const arms = q.mul( q ).add( s.div( L.mul( BOW.armDecay ) ) ).negate().exp().mul( smoothstep( 0, L.mul( 0.4 ), s ) ).mul( L.mul( BOW.armHeight ) );
+		h = h.add( mound.add( arms ).mul( st ) );
+
+	}
+	return h;
+
+}
+
 const TAU = Math.PI * 2;
 
 // Grid: a plane of HALF metres half-extent, remapped so vertices are dense near
@@ -87,6 +162,13 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 		bin.addAssign( vec3( dx.mul( dz ).mul( ss ).negate(), dz.mul( sc ), dz.mul( dz ).mul( ss ).negate() ) );
 
 	}
+
+	// leviathan bow waves: height plus a finite-difference slope for the normal
+	const bh = bowHeight( p ).toVar();
+	const e = 0.6;
+	disp.y.addAssign( bh.mul( height ) );
+	tan.y.addAssign( bowHeight( p.add( vec2( e, 0 ) ) ).sub( bh ).div( e ).mul( height ) );
+	bin.y.addAssign( bowHeight( p.add( vec2( 0, e ) ) ).sub( bh ).div( e ).mul( height ) );
 
 	return { disp, tan, bin, jacobian: tan.x.mul( bin.z ).sub( tan.z.mul( bin.x ) ) };
 
@@ -264,6 +346,11 @@ export class Etherium {
 			bx -= w.dx * w.dz * ss; by += w.dz * sc; bz -= w.dz * w.dz * ss;
 
 		}
+		// leviathan bow waves: height plus a finite-difference slope (matches etheriumWaves)
+		const bh = bowHeightJS( x, z ), e = 0.6;
+		dy += bh * H;
+		ty += ( bowHeightJS( x + e, z ) - bh ) / e * H;
+		by += ( bowHeightJS( x, z + e ) - bh ) / e * H;
 		out.dx = dx; out.dy = dy; out.dz = dz;
 		out.nx = by * tz - bz * ty; out.ny = bz * tx - bx * tz; out.nz = bx * ty - by * tx;
 		return out;

@@ -6,6 +6,7 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { starLayer } from '../sky/Starfield.js';
 import { MIGRATION } from './WorldLayout.js';
+import { setBowWave } from '../sea/Etherium.js';
 
 // Star-whale leviathans (milestone 6). Inspired in spirit by the space whale of Beyond Good & Evil and
 // the leviathans of Death Stranding (our own design): a long, heavy body with wing-like pectoral fins
@@ -200,6 +201,36 @@ export class Leviathans {
 
 	}
 
+	// Keep the board out of the whales' bodies: push it sideways off a capsule along each spine, but only
+	// at body height (you can jump over a back).
+	collide( surfer ) {
+
+		const p = surfer.position, v = surfer.velocity;
+		for ( const w of this.whales ) {
+
+			const m = w.mesh.position, fx = Math.sin( w.mesh.rotation.y ), fz = Math.cos( w.mesh.rotation.y );
+			const lx = p.x - m.x, lz = p.z - m.z;
+			const along = Math.max( - 0.42, Math.min( 0.45, ( lx * fx + lz * fz ) / w.length ) );
+			const r = radius( 0.5 - along ) * w.length + 0.7;
+			if ( p.y > m.y + r * 0.8 || p.y < m.y - r * 1.5 ) continue;
+			const cx = lx - fx * along * w.length, cz = lz - fz * along * w.length;
+			const d = Math.hypot( cx, cz );
+			if ( d >= r || d < 1e-3 ) continue;
+			const nx = cx / d, nz = cz / d;
+			p.x += nx * ( r - d );
+			p.z += nz * ( r - d );
+			const into = v.x * nx + v.z * nz;
+			if ( into < 0 ) {
+
+				v.x -= nx * into * 1.2;
+				v.z -= nz * into * 1.2;
+
+			}
+
+		}
+
+	}
+
 	nextBreach() {
 
 		const [ a, b ] = BREACH.every;
@@ -255,6 +286,10 @@ export class Leviathans {
 			const bob = Math.sin( this.time * 0.35 + w.phase ) * r * 0.25;
 			w.mesh.position.set( x, surface - r * 0.55 + bob + lift, z );
 			w.mesh.rotation.set( - pitch, Math.atan2( L.tx, L.tz ), Math.sin( this.time * 0.3 + w.phase ) * 0.05 );
+
+			// the bow wave rides with the whale; it fades while the whale is up out of the gas
+			const i = this.whales.indexOf( w );
+			setBowWave( i, x, z, L.tx, L.tz, w.length, Math.max( 0, 1 - lift / ( r * 2 ) ) );
 
 		}
 
