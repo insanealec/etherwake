@@ -93,39 +93,71 @@ function bowHeight( p ) {
 
 }
 
-// Flare-fronts (milestone 8): one solitary wave (a sech² ridge) rolling across a region along `dir`,
-// faded out toward the region's edge. setFlareRegion() once, setFlare( s, H ) each frame (s: the
-// front's distance along dir from the region centre; H: its current height, 0 when there's none).
-const flareJS = { cx: 0, cz: 0, dx: 1, dz: 0, R: 1, s: 0, H: 0 };
+// Flare-fronts (milestone 8): up to FRONTS solitary waves (sech² ridges) rolling across a region along
+// `dir`, faded out toward the region's edge; inside the region the ordinary swell is also taller
+// (`swell` multiplier). setFlareRegion() once; setFlare( i, s, H ) each frame per front (s: its distance
+// along dir from the region centre; H: its current height, 0 when there's none).
+export const FRONTS = 3;
+const flareJS = { cx: 0, cz: 0, dx: 1, dz: 0, R: 1, swell: 1, s: [ 0, 0, 0 ], H: [ 0, 0, 0 ] };
 const uFlareA = uniform( new THREE.Vector4( 0, 0, 1, 0 ) ); // cx, cz, dx, dz
-const uFlareB = uniform( new THREE.Vector4( 0, 0, FLARES.width, 1 ) ); // s, H, width, R
+const uFlareB = uniform( new THREE.Vector4( FLARES.width, 1, 1, 0 ) ); // width, R, swell
+const uFlareS = uniform( new THREE.Vector4() ); // front positions
+const uFlareH = uniform( new THREE.Vector4() ); // front heights
 
-export function setFlareRegion( cx, cz, dx, dz, R ) {
+export function setFlareRegion( cx, cz, dx, dz, R, swell = 1 ) {
 
-	Object.assign( flareJS, { cx, cz, dx, dz, R } );
+	Object.assign( flareJS, { cx, cz, dx, dz, R, swell } );
 	uFlareA.value.set( cx, cz, dx, dz );
-	uFlareB.value.w = R;
+	uFlareB.value.y = R;
+	uFlareB.value.z = swell;
 
 }
 
-export function setFlare( s, H ) {
+export function setFlare( i, s, H ) {
 
-	flareJS.s = s;
-	flareJS.H = H;
-	uFlareB.value.x = s;
-	uFlareB.value.y = H;
+	flareJS.s[ i ] = s;
+	flareJS.H[ i ] = H;
+	uFlareS.value.setComponent( i, s );
+	uFlareH.value.setComponent( i, H );
 
 }
+
+const smoothJS = ( a, b, x ) => {
+
+	const t = Math.max( 0, Math.min( 1, ( x - a ) / ( b - a ) ) );
+	return t * t * ( 3 - 2 * t );
+
+};
 
 function flareHeightJS( x, z ) {
 
 	const f = flareJS;
-	if ( f.H <= 0 ) return 0;
 	const lx = x - f.cx, lz = z - f.cz, r = Math.hypot( lx, lz );
 	if ( r >= f.R ) return 0;
-	const a = Math.abs( lx * f.dx + lz * f.dz - f.s ) / FLARES.width, e = Math.exp( - 2 * a );
-	const k = Math.min( 1, ( f.R - r ) / ( 0.3 * f.R ) ), fade = k * k * ( 3 - 2 * k );
-	return f.H * 4 * e / ( ( 1 + e ) * ( 1 + e ) ) * fade;
+	const u = lx * f.dx + lz * f.dz, fade = smoothJS( f.R, f.R * 0.7, r );
+	let h = 0;
+	for ( let i = 0; i < FRONTS; i ++ ) {
+
+		if ( f.H[ i ] <= 0 ) continue;
+		const e = Math.exp( - 2 * Math.abs( u - f.s[ i ] ) / FLARES.width );
+		h += f.H[ i ] * 4 * e / ( ( 1 + e ) * ( 1 + e ) );
+
+	}
+	return h * fade;
+
+}
+
+// the region's swell multiplier at (x, z): 1 outside, `swell` well inside
+function swellFactorJS( x, z ) {
+
+	const f = flareJS;
+	return 1 + ( f.swell - 1 ) * smoothJS( f.R * 1.1, f.R * 0.6, Math.hypot( x - f.cx, z - f.cz ) );
+
+}
+
+function swellFactor( p ) {
+
+	return uFlareB.z.sub( 1 ).mul( smoothstep( uFlareB.y.mul( 1.1 ), uFlareB.y.mul( 0.6 ), length( p.sub( uFlareA.xy ) ) ) ).add( 1 );
 
 }
 
@@ -136,11 +168,15 @@ export const flareHeightAt = ( x, z ) => flareHeightJS( x, z );
 function flareHeight( p ) {
 
 	const l = p.sub( uFlareA.xy );
-	const a = dot( l, uFlareA.zw ).sub( uFlareB.x ).abs().div( uFlareB.z );
-	const e = a.mul( - 2 ).exp();
-	const sech2 = e.mul( 4 ).div( e.add( 1 ).mul( e.add( 1 ) ) );
-	const fade = smoothstep( uFlareB.w, uFlareB.w.mul( 0.7 ), length( l ) );
-	return uFlareB.y.mul( sech2 ).mul( fade );
+	const u = dot( l, uFlareA.zw );
+	let h = float( 0 );
+	for ( const c of [ 'x', 'y', 'z' ] ) {
+
+		const e = u.sub( uFlareS[ c ] ).abs().div( uFlareB.x ).mul( - 2 ).exp();
+		h = h.add( uFlareH[ c ].mul( e.mul( 4 ).div( e.add( 1 ).mul( e.add( 1 ) ) ) ) );
+
+	}
+	return h.mul( smoothstep( uFlareB.y, uFlareB.y.mul( 0.7 ), length( l ) ) );
 
 }
 
@@ -200,6 +236,7 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 
 	const dist = length( p.sub( fadeFrom ) );
 	const calm = mix( float( HARBOR.calm ), float( 1 ), smoothstep( uHarbor.z, uHarbor.w, length( p.sub( uHarbor.xy ) ) ) );
+	const hs = height.mul( swellFactor( p ) ); // taller swell inside the Flare Reach
 	const disp = vec3( 0 ).toVar();
 	const tan = vec3( 1, 0, 0 ).toVar();
 	const bin = vec3( 0, 0, 1 ).toVar();
@@ -211,9 +248,9 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 		const f = k.mul( dot( a.xy, p ) ).sub( b.x.mul( time ) );
 		const c = cos( f ), sn = sin( f );
 		const amp = s.div( k );
-		const ss = s.mul( sn ), sc = s.mul( c ).mul( height );
+		const ss = s.mul( sn ), sc = s.mul( c ).mul( hs );
 
-		disp.addAssign( vec3( dx.mul( amp ).mul( c ), amp.mul( sn ).mul( height ), dz.mul( amp ).mul( c ) ) );
+		disp.addAssign( vec3( dx.mul( amp ).mul( c ), amp.mul( sn ).mul( hs ), dz.mul( amp ).mul( c ) ) );
 		tan.addAssign( vec3( dx.mul( dx ).mul( ss ).negate(), dx.mul( sc ), dx.mul( dz ).mul( ss ).negate() ) );
 		bin.addAssign( vec3( dx.mul( dz ).mul( ss ).negate(), dz.mul( sc ), dz.mul( dz ).mul( ss ).negate() ) );
 
@@ -396,7 +433,7 @@ export class Etherium {
 	// JS twin of etheriumWaves: displacement and normal of the grid point (x, z).
 	sampleGrid( x, z, t, out ) {
 
-		const H = SEA.height, calm = harborCalm( x, z );
+		const H = SEA.height * swellFactorJS( x, z ), HX = SEA.height, calm = harborCalm( x, z );
 		let dx = 0, dy = 0, dz = 0, tx = 1, ty = 0, tz = 0, bx = 0, by = 0, bz = 1;
 		for ( const w of this.waves ) {
 
@@ -411,9 +448,9 @@ export class Etherium {
 		}
 		// leviathan bow waves: height plus a finite-difference slope (matches etheriumWaves)
 		const bh = extraHeightJS( x, z ), e = 0.6;
-		dy += bh * H;
-		ty += ( extraHeightJS( x + e, z ) - bh ) / e * H;
-		by += ( extraHeightJS( x, z + e ) - bh ) / e * H;
+		dy += bh * HX;
+		ty += ( extraHeightJS( x + e, z ) - bh ) / e * HX;
+		by += ( extraHeightJS( x, z + e ) - bh ) / e * HX;
 		out.dx = dx; out.dy = dy; out.dz = dz;
 		out.nx = by * tz - bz * ty; out.ny = bz * tx - bx * tz; out.nz = bx * ty - by * tx;
 		return out;

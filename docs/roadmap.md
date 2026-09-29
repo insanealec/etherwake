@@ -163,6 +163,17 @@
   **solar drive** (`SHIP.solar` 0.6): starlight in the sails gives that share of full push on any heading;
   the wind adds more on good points of sail (`push = thrust * max( solar, windEfficiency ) * sail`).
   Dead upwind ~21 m/s (HUD says "solar drive"), beam ~30; anchorage to the Reach in ~94 s at ~26 m/s.
+- **Flare Reach, round 2 (2026-09-29),** user: "kinda small", waves "not any more wild", "nothing to do or
+  stop there", "not worth the distance for the points since there's no nearby shop"; no danger wanted.
+  Now: radius 1400 m; the Reach's ordinary swell is 1.8x taller (`REGIONS.flare.swell`, a regional
+  height factor in both wave functions: ~33 m crest-to-trough vs ~17 outside); fronts every 50 s, 15 m,
+  up to `FRONTS` = 3 at once (`setFlare( i, s, H )`, uniforms `uFlareS` / `uFlareH`); **sunstones**:
+  10 rose-gold gems along each front's crest, placed around the player's line (+20, `REACH.sunstone`);
+  **credits x2** inside the Reach (`App.earn()`, `REACH.multiplier`; tricks, bow waves, flare riding,
+  sunstones; HUD tag); the **Ember Outpost** (`src/world/Outpost.js`, `OUTPOST` in WorldLayout): a
+  floating raft at the Reach's heart riding the swell, lantern mast, awnings, a mooring buoy, and the
+  **Outpost trader** (`TRADER` in Characters) who opens the same shop as the shipwright (upgrades and
+  the galleon deed).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -226,10 +237,8 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's play-test of the Flare Reach (front size, speed, frequency, reward, looks). Possible
-next: danger in the Reach (e.g. the front wipes you out if it catches you head-on, or heat that builds
-while you're in it), a dockmaster courier run or race out there, a hint about the Reach from an NPC.
-Then more regions: the gas giant's rings (ice slalom), the black hole rim (lensing); then a title screen,
+Get the user's play-test of the revised Flare Reach. Then more regions (the gas giant's rings with an ice
+slalom, the black hole rim with lensing), each with its own reason to visit; then a title screen,
 performance work and a GitHub Pages deploy.
 
 ## Working rules (base subscription, so be economical)

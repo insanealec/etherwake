@@ -1,6 +1,12 @@
 // Port characters: who stands where and what they say. Names are placeholders (see docs/concept.md).
 // shack: index into the port's shacks (0 is just north of the east pier, 7 just south of it).
 
+// at the Ember Outpost, in the Flare Reach
+export const TRADER = {
+	id: 'trader', name: 'Outpost trader',
+	greeting: 'Made it out to the Reach, did you? Everything the shipwright sells, I sell, and closer to the flares. What\'ll it be?'
+};
+
 // aboard the solar galleon
 export const QUARTERMASTER = {
 	name: 'Quartermaster',

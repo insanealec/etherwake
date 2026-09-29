@@ -18,13 +18,15 @@ import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
 import { Dialogue } from './ui/Dialogue.js';
-import { QUARTERMASTER } from './game/Characters.js';
+import { QUARTERMASTER, TRADER } from './game/Characters.js';
 import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Leviathans } from './world/Leviathans.js';
 import { Galleon, HELM_SPOT } from './world/Galleon.js';
 import { Regions } from './world/Regions.js';
+import { Outpost } from './world/Outpost.js';
+import { REACH } from './game/Flares.js';
 import { Audio } from './audio/Audio.js';
 import { WhaleSong } from './audio/WhaleSong.js';
 import { Courier } from './game/Courier.js';
@@ -106,6 +108,8 @@ export class App {
 		this.leviathans = new Leviathans( this.scene, this.sea );
 		this.galleon = new Galleon( this.scene, this.sea, this.save.data.galleon );
 		this.regions = new Regions( this.scene, this.sea );
+		this.regions.onSunstone = ( pos ) => this.onSunstone( pos );
+		this.outpost = new Outpost( this.scene, this.sea );
 		this.shipCam = new ChaseCamera( this.camera, this.sea, { distance: 42, height: 16, lookAhead: 25, lookUp: 6, follow: 2.5, aim: 5, clearance: 4 } );
 		this.walkCam.obstacles = [ ...this.port.cameraObstacles, ...this.galleon.cameraObstacles ];
 		this.song = new WhaleSong( this.audio, this.leviathans );
@@ -225,6 +229,7 @@ export class App {
 			this.port.collide( this.surfer );
 			this.leviathans.collide( this.surfer );
 			this.galleon.collide( this.surfer );
+			this.outpost.collide( this.surfer );
 			this.rideBowWave( dt );
 			this.rideFlare( dt );
 
@@ -240,13 +245,14 @@ export class App {
 		this.port.update( dt, WIND.angle );
 		this.leviathans.update( dt );
 		const helm = this.mode === 'helm' && ! this.dialogue.active;
+		this.outpost.update( dt );
 		this.galleon.update( dt, helm ? { steer: key( 'KeyD' ) - key( 'KeyA' ), sail: key( 'KeyW' ) - key( 'KeyS' ) } : null );
 		if ( this.mode === 'helm' && this.time > ( this.poseSavedAt || 0 ) + 5 ) this.saveShipPose();
 		if ( this.onFoot ) this.walker.sync(); // the deck may have moved under you
 		this.song.update( dt, this.camera.position );
 		this.audio.update( this.camera );
 		this.spotPod();
-		this.onRegion( this.regions.update( dt, this.camera.position ) );
+		this.onRegion( this.regions.update( dt, this.camera.position, this.onFoot ? null : this.surfer.position ) );
 		this.spotGalleon();
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
@@ -307,7 +313,7 @@ export class App {
 			// slow for the port; matching speed for the galleon (she may be under way)
 			const slow = s.speed < 10;
 			const matched = Math.hypot( s.velocity.x - this.galleon.velocity.x, s.velocity.z - this.galleon.velocity.z ) < 8;
-			const npc = slow ? this.npcs.nearestMooring( s.position ) : null;
+			const npc = ! slow ? null : this.outpost.nearMooring( s.position ) ? TRADER : this.npcs.nearestMooring( s.position );
 			const spot = npc ? null : ( slow && this.port.dockPoint( s.position.x, s.position.z ) ) || ( matched && this.galleon.dockPoint( s.position.x, s.position.z ) );
 			if ( npc ) {
 
@@ -382,7 +388,7 @@ export class App {
 	// Characters with something to offer build their conversation here; others just chat.
 	talkTo( npc ) {
 
-		if ( npc.id === 'shipwright' ) return this.openShop( npc );
+		if ( npc.id === 'shipwright' || npc.id === 'trader' ) return this.openShop( npc );
 		if ( npc.id === 'marshal' ) return this.openRaces( npc );
 		if ( npc.id !== 'dockmaster' ) return this.dialogue.open( npc.name, npc.lines );
 		const c = this.courier;
@@ -433,7 +439,7 @@ export class App {
 
 		}
 		choices.push( { key: 'KeyQ', label: 'Q · that’s all' } );
-		this.dialogue.open( npc.name, [ line || `What'll it be? You've got ${ this.save.credits } ✦ to spend.` ], choices );
+		this.dialogue.open( npc.name, [ line || npc.greeting || `What'll it be? You've got ${ this.save.credits } ✦ to spend.` ], choices );
 
 	}
 
@@ -605,9 +611,9 @@ export class App {
 		if ( this.flareTime >= REWARDS.flareEvery ) {
 
 			this.flareTime -= REWARDS.flareEvery;
-			this.save.addCredits( REWARDS.flare );
+			const got = this.earn( REWARDS.flare );
 			this.save.stat( 'flareRides', ( n ) => n + 1 );
-			this.toast( `Riding the flare! · +${ REWARDS.flare } ✦` );
+			this.toast( `Riding the flare! · +${ got } ✦${ this.reachTag }` );
 
 		}
 
@@ -629,9 +635,9 @@ export class App {
 		if ( this.bowTime >= REWARDS.bowEvery ) {
 
 			this.bowTime -= REWARDS.bowEvery;
-			this.save.addCredits( REWARDS.bow );
+			const got = this.earn( REWARDS.bow );
 			this.save.stat( 'bowRides', ( n ) => n + 1 );
-			this.toast( `Riding with the leviathans · +${ REWARDS.bow } ✦` );
+			this.toast( `Riding with the leviathans · +${ got } ✦${ this.reachTag }` );
 
 		}
 
@@ -684,8 +690,7 @@ export class App {
 		this.chase.land( r.impact );
 		this.spray.burst( this.surfer, Math.min( 40, 6 + r.impact * 3 ) | 0 );
 		if ( r.kind === 'wipeout' ) return this.toast( 'Wipeout!' );
-		const pay = trickPayout( r );
-		this.save.addCredits( pay );
+		const pay = this.earn( trickPayout( r ) );
 		if ( r.spin >= 180 ) this.save.stat( 'tricks', ( n ) => n + 1 );
 		this.save.stat( 'bestAir', ( b ) => Math.max( b, +r.air.toFixed( 2 ) ) );
 		const parts = [];
@@ -694,8 +699,32 @@ export class App {
 		if ( r.air >= 1.8 ) parts.push( `${ r.air.toFixed( 1 ) }s air` );
 		if ( r.kind === 'sketchy' ) parts.push( 'sketchy' );
 		else if ( parts.length ) parts.push( 'clean' );
-		if ( pay > 0 ) parts.push( `+${ pay } ✦` );
+		if ( pay > 0 ) parts.push( `+${ pay } ✦${ this.reachTag }` );
 		if ( parts.length ) this.toast( parts.join( ' · ' ) );
+
+	}
+
+	// Credits from riding and tricks: doubled inside the Flare Reach. Returns what was paid.
+	earn( n ) {
+
+		const got = Math.round( n * ( this.regions.inReach ? REACH.multiplier : 1 ) );
+		this.save.addCredits( got );
+		return got;
+
+	}
+
+	get reachTag() {
+
+		return this.regions.inReach ? ` (×${ REACH.multiplier })` : '';
+
+	}
+
+	onSunstone( pos ) {
+
+		const got = this.earn( REACH.sunstone );
+		this.save.stat( 'sunstones', ( n ) => n + 1 );
+		this.spray.burst( { position: pos, velocity: this.surfer.velocity }, 14 );
+		this.toast( `Sunstone! · +${ got } ✦${ this.reachTag }` );
 
 	}
 
@@ -732,7 +761,7 @@ export class App {
 		const s = this.surfer, sail = s.sailState;
 		const power = sail.efficiency === undefined ? '' : `  ·  ${ sail.name } ${ Math.round( sail.efficiency * 100 ) }%`;
 		const G = this.galleon;
-		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ '▰'.repeat( Math.round( G.sail * 5 ) ) }${ '▱'.repeat( 5 - Math.round( G.sail * 5 ) ) } ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.solarOnly ? 'solar drive' : G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }`;
+		const text = this.mode === 'helm' ? `${ this.hudHint }  ·  ${ G.speed.toFixed( 0 ) } m/s  ·  sails ${ '▰'.repeat( Math.round( G.sail * 5 ) ) }${ '▱'.repeat( 5 - Math.round( G.sail * 5 ) ) } ${ Math.round( G.sail * 100 ) }%${ G.sailState.name ? `  ·  ${ G.solarOnly ? 'solar drive' : G.sailState.name }` : '' }` : this.onFoot ? this.hudHint : `${ this.hudHint }  ·  ${ s.speed.toFixed( 0 ) } m/s${ s.grounded ? '' : ' · air' }${ power }${ this.regions.inReach ? `  ·  Flare Reach: credits ×${ REACH.multiplier }` : '' }`;
 		if ( text !== this.hudText ) this.hud.textContent = this.hudText = text;
 
 	}

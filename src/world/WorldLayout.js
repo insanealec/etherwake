@@ -22,8 +22,12 @@ export const GALLEON = { x: - 120, z: - 1150, yaw: 0.3 };
 // The Flare Reach lies toward the sun (the sun's horizontal direction from the harbour, ~4 km out);
 // flare-fronts roll across it away from the sun along `dir`.
 export const REGIONS = {
-	flare: { name: 'the Flare Reach', x: - 2480, z: - 3120, radius: 750, dir: [ 0.62, 0.78 ] }
+	// swell: the Reach's swell height multiplier (blends in toward the edge)
+	flare: { name: 'the Flare Reach', x: - 2480, z: - 3120, radius: 1400, dir: [ 0.62, 0.78 ], swell: 1.8 }
 };
+
+// The Ember Outpost: a floating trading raft at the heart of the Flare Reach
+export const OUTPOST = { x: - 2480, z: - 3120 };
 
 // The leviathans' migration loop: an ellipse around the harbour, swum anticlockwise seen from above.
 export const MIGRATION = {

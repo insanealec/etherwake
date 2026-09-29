@@ -1,8 +1,8 @@
 import * as THREE from 'three/webgpu';
-import { uv, vec3, float, sin, smoothstep, length, positionWorld, cameraPosition, mx_noise_float } from 'three/tsl';
+import { uv, vec3, float, smoothstep, length, positionWorld, cameraPosition, mx_noise_float } from 'three/tsl';
 import { REGIONS } from './WorldLayout.js';
 import { FLARES } from '../game/Flares.js';
-import { setFlareRegion, setFlare } from '../sea/Etherium.js';
+import { setFlareRegion, setFlare, FRONTS } from '../sea/Etherium.js';
 import { uSunBoost } from '../sky/Starfield.js';
 
 const smooth = ( a, b, x ) => {
@@ -12,22 +12,30 @@ const smooth = ( a, b, x ) => {
 
 };
 
+const _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion();
+const _p = new THREE.Vector3();
+const _s = new THREE.Vector3();
+
 // Regions (milestone 8). The Flare Reach: its atmosphere blends in as you approach (warmer fog and
-// sea), a flickering ember column marks it from afar, and every FLARES.period seconds the star flares:
-// the sun pulses (warning), then a flare-front rolls across the Reach away from the sun.
-// update() returns 'enter', 'leave', 'warning' or 'launch' on those events (null otherwise).
+// sea, taller swell), a flickering ember column marks it from afar, and every FLARES.period seconds the
+// star flares: the sun pulses (warning), then a flare-front rolls across the Reach away from the sun
+// (up to FRONTS at once). Each front carries a cluster of sunstones along its crest, placed around the
+// player. update() returns 'enter', 'leave', 'warning' or 'launch' on those events (null otherwise);
+// onSunstone( position ) reports pickups.
 export class Regions {
 
 	constructor( scene, sea ) {
 
 		this.sea = sea;
+		this.onSunstone = null;
 		const R = this.flare = REGIONS.flare;
 		const l = Math.hypot( ...R.dir );
 		this.dir = [ R.dir[ 0 ] / l, R.dir[ 1 ] / l ];
-		setFlareRegion( R.x, R.z, this.dir[ 0 ], this.dir[ 1 ], R.radius );
-		this.clock = FLARES.period - 30; // the first flare ~30 s after starting
+		setFlareRegion( R.x, R.z, this.dir[ 0 ], this.dir[ 1 ], R.radius, R.swell );
+		this.clock = FLARES.period - 20; // the first flare ~20 s after starting
 		this.inside = false;
-		this.phase = 'calm';
+		this.fronts = Array.from( { length: FRONTS }, () => ( { age: - 1, stones: [] } ) );
 
 		// the ember column: tall, soft-edged, flickering, visible through the haze, faded up close
 		const mat = new THREE.MeshBasicNodeMaterial( { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false } );
@@ -41,14 +49,41 @@ export class Regions {
 		this.column.frustumCulled = false;
 		scene.add( this.column );
 
+		// sunstones: big rose-gold gems riding the fronts
+		const gem = new THREE.MeshBasicNodeMaterial( { color: new THREE.Color( 3.2, 1.3, 0.7 ) } );
+		this.gems = new THREE.InstancedMesh( new THREE.OctahedronGeometry( 0.8 ), gem, FRONTS * FLARES.sunstones );
+		this.gems.instanceMatrix.setUsage( THREE.DynamicDrawUsage );
+		this.gems.frustumCulled = false;
+		scene.add( this.gems );
+		this.time = 0;
+
 	}
 
-	// focus: where the player is (the camera); dt: game time step
-	update( dt, focus ) {
+	get inReach() {
 
-		const R = this.flare;
+		return this.inside;
+
+	}
+
+	launch( front, focus ) {
+
+		const R = this.flare, [ dx, dz ] = this.dir;
+		front.age = 0;
+		// a cluster of sunstones along the crest, centred on the player's line (else the middle)
+		const lx = focus.x - R.x, lz = focus.z - R.z;
+		const across = this.inside ? - lx * dz + lz * dx : 0;
+		front.stones = [];
+		for ( let i = 0; i < FLARES.sunstones; i ++ ) front.stones.push( { v: across + ( i - ( FLARES.sunstones - 1 ) / 2 ) * 28, taken: false } );
+
+	}
+
+	// focus: where the player is (the camera); rider: the surfer (collects sunstones)
+	update( dt, focus, rider ) {
+
+		this.time += dt;
+		const R = this.flare, F = FLARES, [ dx, dz ] = this.dir;
 		const d = Math.hypot( focus.x - R.x, focus.z - R.z );
-		const mix = smooth( R.radius * 1.35, R.radius * 0.85, d );
+		const mix = smooth( R.radius * 1.2, R.radius * 0.85, d );
 		this.sea.regionMix = mix;
 
 		let event = null;
@@ -64,53 +99,71 @@ export class Regions {
 
 		}
 
-		// the flare cycle: warning, then a front crossing the Reach from its sunward edge
-		const F = FLARES;
+		// the flare cycle: a warning, then a new front launches from the sunward edge
 		const prev = this.clock % F.period;
 		this.clock += dt;
 		const t = this.clock % F.period;
-		const travel = 2 * R.radius / F.speed;
 		let boost = 0;
 		if ( t < F.warn ) {
 
-			if ( prev >= F.warn ) {
-
-				this.phase = 'warning';
-				if ( mix > 0.2 && ! event ) event = 'warning';
-
-			}
+			if ( prev >= F.warn && mix > 0.2 && ! event ) event = 'warning';
 			boost = ( 0.6 + 0.6 * Math.sin( this.clock * 7 ) ) * ( t / F.warn );
-			setFlare( 0, 0 );
 
-		} else if ( t < F.warn + travel ) {
+		} else if ( prev < F.warn ) {
 
-			if ( prev < F.warn ) {
+			const free = this.fronts.find( ( f ) => f.age < 0 );
+			if ( free ) {
 
-				this.phase = 'front';
+				this.launch( free, focus );
 				if ( mix > 0.2 && ! event ) event = 'launch';
 
 			}
-			const u = t - F.warn;
-			const envelope = smooth( 0, 3, u ) * smooth( travel, travel - 5, u );
-			setFlare( - R.radius + u * F.speed, F.height * envelope );
-			boost = 2 * Math.max( 0, 1 - u / 4 );
-
-		} else {
-
-			this.phase = 'calm';
-			setFlare( 0, 0 );
 
 		}
+
+		// fronts roll across; their sunstones ride the crest
+		const travel = 1.8 * R.radius / F.speed;
+		let n = 0;
+		this.fronts.forEach( ( f, i ) => {
+
+			if ( f.age >= 0 ) {
+
+				f.age += dt;
+				boost = Math.max( boost, 2 * Math.max( 0, 1 - f.age / 4 ) );
+				if ( f.age > travel ) f.age = - 1;
+
+			}
+			const alive = f.age >= 0;
+			const s = - 0.9 * R.radius + ( alive ? f.age : 0 ) * F.speed;
+			const H = alive ? F.height * smooth( 0, 3, f.age ) * smooth( travel, travel - 6, f.age ) : 0;
+			setFlare( i, s, H );
+
+			for ( const st of f.stones ) {
+
+				const x = R.x + dx * s - dz * st.v, z = R.z + dz * s + dx * st.v;
+				const inside = Math.hypot( x - R.x, z - R.z ) < R.radius * 0.9;
+				let k = 0;
+				if ( alive && ! st.taken && inside && H > 2 ) {
+
+					_p.set( x, this.sea.heightAt( x, z ) + F.sunstoneLift, z );
+					if ( rider && _p.distanceTo( _s.set( rider.x, rider.y + 0.8, rider.z ) ) < F.sunstoneRadius ) {
+
+						st.taken = true;
+						if ( this.onSunstone ) this.onSunstone( _p.clone() );
+
+					} else k = 1;
+
+				}
+				_q.setFromAxisAngle( _s.set( 0, 1, 0 ), this.time * 2 + st.v );
+				this.gems.setMatrixAt( n ++, _m.compose( _p, _q, _s.set( k, k * 1.4, k ) ) );
+
+			}
+
+		} );
+		this.gems.count = n;
+		this.gems.instanceMatrix.needsUpdate = true;
 		uSunBoost.value = boost * mix;
 		return event;
-
-	}
-
-	// seconds until the next front launches (for hints)
-	get nextFlareIn() {
-
-		const t = this.clock % FLARES.period;
-		return t < FLARES.warn ? FLARES.warn - t : FLARES.period - t + FLARES.warn;
 
 	}
 
