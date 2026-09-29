@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 7, the galleon (slice 1 done: the ship at anchor). Milestone 6 done (the user likes the ghostly song).
+- **Current milestone:** 7, the galleon (slices 1-2 done: at anchor, boarding and walking the deck). Milestone 6 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -123,6 +123,15 @@
   the full swell at anchor (height, pitch and roll from sampling bow, stern and both sides, smoothed).
   An oriented-box collider stops the board (skipped above deck height). "The solar galleon!" toast on
   first approach (saved as `foundGalleon`).
+- **Milestone 7 slice 2 (2026-09-29):** boarding. `Walker` now stands on a **platform**
+  (`{ deckY, yaw, walkable( lx, lz ), toWorld( local, out ), launchEdge( lx, lz ) }`), keeps `local`
+  coordinates and refreshes world `position` in `sync()` every frame (App calls it after the galleon
+  floats), so a moving deck carries you. `port.platform` (local = world) and `galleon.platform` (ship
+  coordinates via `group.matrixWorld`). Galleon: `walkable` (between the rails, not the stern castle or
+  the masts), `toLocal`, `dockPoint` (alongside the hull, slow: "E · climb aboard"), `launchEdge` (either
+  rail: over the side, heading away), `cameraObstacles` (hull, castle, masts; the walk camera uses port +
+  ship obstacles). The **Quartermaster** (`QUARTERMASTER` in `game/Characters.js`) stands by the stern
+  castle: the helm stays lashed "till the shipwright signs her over" (the hook for slice 3).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -186,12 +195,12 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 7 slice 2: **board the galleon and walk its deck**. The walker needs a moving platform: keep
-the walker's position in ship-local coordinates and convert to world each frame (`Walker` currently uses
-`port.walkable()` and a fixed `DECK_Y`; generalise to a platform with `walkable( lx, lz )`, `toWorld()`,
-deck height). Dock from the board at the rail (like the port's `dockPoint`), launch from the rail. Maybe a
-ship's quartermaster NPC. Slice 3: take the helm and sail it (ship physics on the swell with the solar
-wind; the board rides along), and launch the board from the deck.
+Milestone 7 slice 3: **take the helm**. Get the galleon signed over (probably bought from or granted
+by the shipwright once you've earned enough, saved), a helm on the stern castle (steps up from the deck),
+E at the helm switches to a sailing mode: steer with A/D, sail with W, the solar wind drives it like the
+board (point of sail), heavier and slower, riding the swell; a chase camera behind the ship; the walker
+and the board ride along. Launch the board from the deck while under way. Later: regions to sail to
+(milestone 8).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

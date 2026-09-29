@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { Fn, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, positionWorld, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
 import { GALLEON } from './WorldLayout.js';
+import { buildFigure } from '../player/Figure.js';
 
 // The solar galleon (milestone 7), procedural first pass in a Treasure Planet-like spirit (our own
 // design): a wooden hull with a rising sheer and brass trim, a stern castle with lit windows, a
@@ -15,6 +16,9 @@ export const SHIP = {
 };
 
 const HALF = SHIP.length / 2, W = SHIP.beam / 2;
+const DECK = 0.4; // deck surface height in ship coordinates
+const CASTLE_FRONT = - HALF + 9; // the stern castle spans from here back to the stern
+const MASTS = [ 6, - 3 ]; // mast positions along the ship (z)
 const smooth = ( a, b, x ) => {
 
 	const t = Math.max( 0, Math.min( 1, ( x - a ) / ( b - a ) ) );
@@ -115,6 +119,84 @@ export class Galleon {
 		this.build();
 		this.float( 1, true );
 
+		// the deck as a platform for the walker: local coordinates move with the ship
+		const g = this.group;
+		this.platform = {
+			deckY: DECK,
+			get yaw() {
+
+				return g.rotation.y;
+
+			},
+			walkable: ( lx, lz ) => this.walkable( lx, lz ),
+			toWorld: ( local, out ) => out.copy( local ).applyMatrix4( g.matrixWorld ),
+			launchEdge: ( lx, lz ) => this.launchEdge( lx, lz )
+		};
+
+		// the quartermaster, minding the ship by the stern castle
+		this.crew = buildFigure( { coat: 0x24485a, hat: 0x3a2a1a } );
+		this.crew.position.set( 1.8, DECK, CASTLE_FRONT + 1.5 );
+		g.add( this.crew );
+
+	}
+
+	// ship-local deck spot -> is it walkable (between the rails, not in the castle or a mast)?
+	walkable( lx, lz ) {
+
+		const t = ( HALF - lz ) / SHIP.length;
+		if ( t < 0.07 || t > 0.97 ) return false;
+		if ( Math.abs( lx ) > halfWidth( t ) * 0.94 - 0.55 ) return false;
+		if ( lz < CASTLE_FRONT && Math.abs( lx ) < 3.9 ) return false;
+		for ( const mz of MASTS ) if ( Math.hypot( lx, lz - mz ) < 0.7 ) return false;
+		return true;
+
+	}
+
+	// world ( x, z ) -> ship-local { x, z }
+	toLocal( x, z ) {
+
+		const g = this.group.position, y = this.group.rotation.y, c = Math.cos( y ), s = Math.sin( y );
+		const wx = x - g.x, wz = z - g.z;
+		return { x: wx * c - wz * s, z: wx * s + wz * c };
+
+	}
+
+	// Docking from the board alongside the hull: the deck spot just inside the nearer rail, or null.
+	dockPoint( x, z ) {
+
+		const l = this.toLocal( x, z );
+		if ( Math.abs( l.z ) > HALF - 3 || Math.abs( l.x ) > W + 6 || Math.abs( l.x ) < W - 1.5 ) return null;
+		const t = ( HALF - l.z ) / SHIP.length;
+		const spot = { x: Math.sign( l.x ) * ( halfWidth( t ) * 0.94 - 0.9 ), z: l.z, platform: this.platform };
+		return this.walkable( spot.x, spot.z ) ? spot : null;
+
+	}
+
+	// Launching from the deck: at either rail, the world sea spot just over the side and the heading out.
+	launchEdge( lx, lz ) {
+
+		const t = ( HALF - lz ) / SHIP.length;
+		if ( Math.abs( lx ) < halfWidth( t ) * 0.94 - 1.7 ) return null;
+		const side = Math.sign( lx ) || 1;
+		this.group.updateMatrixWorld();
+		const out = new THREE.Vector3( side * ( W + 3.5 ), 0, lz ).applyMatrix4( this.group.matrixWorld );
+		const y = this.group.rotation.y; // local +x in the world is ( cos y, -sin y )
+		return { x: out.x, z: out.z, yaw: Math.atan2( side * Math.cos( y ), - side * Math.sin( y ) ) };
+
+	}
+
+	// solid parts the walk camera shouldn't pass through
+	get cameraObstacles() {
+
+		return this.solid;
+
+	}
+
+	// the quartermaster's world position (for talking and facing)
+	crewPosition( out = new THREE.Vector3() ) {
+
+		return this.crew.getWorldPosition( out );
+
 	}
 
 	build() {
@@ -153,15 +235,17 @@ export class Galleon {
 		} )();
 
 		const g = this.group;
-		g.add( new THREE.Mesh( hullGeometry(), wood ) );
+		const hull = new THREE.Mesh( hullGeometry(), wood );
+		g.add( hull );
 		const deck = new THREE.Mesh( deckGeometry(), deckWood );
-		deck.position.y = 0.4;
+		deck.position.y = DECK;
 		g.add( deck );
 
 		// stern castle with a row of lit windows across the back
 		const castle = new THREE.Mesh( new THREE.BoxGeometry( 7.2, 2.8, 8 ), wood );
 		castle.position.set( 0, 1.8, - HALF + 5 );
 		g.add( castle );
+		this.solid = [ hull, castle ];
 		for ( let i = 0; i < 4; i ++ ) {
 
 			const win = new THREE.Mesh( new THREE.PlaneGeometry( 0.9, 0.7 ), windowGlow );
@@ -178,11 +262,12 @@ export class Galleon {
 		g.add( sprit );
 
 		// masts and solar sails
-		for ( const [ z, h, sw, sh ] of [ [ 6, 20, 10, 8 ], [ - 3, 24, 12, 10 ] ] ) {
+		for ( const [ z, h, sw, sh ] of [ [ MASTS[ 0 ], 20, 10, 8 ], [ MASTS[ 1 ], 24, 12, 10 ] ] ) {
 
 			const mast = new THREE.Mesh( new THREE.CylinderGeometry( 0.22, 0.32, h, 10 ), wood );
 			mast.position.set( 0, h / 2, z );
 			g.add( mast );
+			this.solid.push( mast );
 			const s = new THREE.Mesh( sailGeometry( sw, sh, 1.2 ), sail );
 			s.position.set( 0, h * 0.55, z + 0.4 );
 			g.add( s );
@@ -252,7 +337,7 @@ export class Galleon {
 		this.lift += ( mean - this.lift ) * k;
 		this.pitch += ( pitch - this.pitch ) * k;
 		this.roll += ( roll - this.roll ) * k;
-		g.position.y = this.lift + SHIP.freeboard - 0.4;
+		g.position.y = this.lift + SHIP.freeboard - DECK;
 		g.rotation.x = - this.pitch;
 		g.rotation.z = this.roll;
 
@@ -262,13 +347,14 @@ export class Galleon {
 
 		this.time += dt;
 		this.float( dt );
+		this.group.updateMatrixWorld();
 
 	}
 
 	// deck height in world space (at the ship's centre)
 	get deckY() {
 
-		return this.group.position.y + 0.4;
+		return this.group.position.y + DECK;
 
 	}
 

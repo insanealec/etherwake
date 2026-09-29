@@ -31,6 +31,15 @@ export class Port {
 		// collider in world space
 		this.circle = { x: HARBOR.x, z: HARBOR.z, r: RING_OUT };
 
+		// the boardwalk as a platform for the walker (it doesn't move: local = world)
+		this.platform = {
+			deckY: DECK_Y + 0.5,
+			yaw: 0,
+			walkable: ( x, z ) => this.walkable( x, z ),
+			toWorld: ( local, out ) => out.copy( local ),
+			launchEdge: ( x, z ) => this.launchEdge( x, z )
+		};
+
 	}
 
 	materials() {
@@ -238,6 +247,7 @@ export class Port {
 		const lx = x - HARBOR.x, lz = z - HARBOR.z, r = Math.hypot( lx, lz );
 		if ( r < RING_OUT - 1 || r > RING_OUT + 6 ) return null;
 		const spot = { x: HARBOR.x + lx / r * ( RING_OUT - 1.2 ), z: HARBOR.z + lz / r * ( RING_OUT - 1.2 ) };
+		spot.platform = this.platform;
 		return this.walkable( spot.x, spot.z ) ? spot : null;
 
 	}

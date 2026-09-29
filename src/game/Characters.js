@@ -1,6 +1,16 @@
 // Port characters: who stands where and what they say. Names are placeholders (see docs/concept.md).
 // shack: index into the port's shacks (0 is just north of the east pier, 7 just south of it).
 
+// aboard the solar galleon
+export const QUARTERMASTER = {
+	name: 'Quartermaster',
+	lines: [
+		'Ahoy, and mind the wet planks. Welcome aboard the old courier galleon.',
+		'The captain\'s ashore and the helm stays lashed till the shipwright signs her over.',
+		'Till then, the deck\'s yours to wander. Drop in off either rail when you\'ve had your fill.'
+	]
+};
+
 export const CHARACTERS = [
 	{
 		id: 'dockmaster', name: 'Dockmaster', shack: 0, coat: 0x3b2a55, hat: 0x1c1420,

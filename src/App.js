@@ -18,6 +18,7 @@ import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
 import { Dialogue } from './ui/Dialogue.js';
+import { QUARTERMASTER } from './game/Characters.js';
 import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
@@ -93,7 +94,7 @@ export class App {
 		this.chase = new ChaseCamera( this.camera, this.sea );
 		this.surfer.onLand = ( r ) => this.onLand( r );
 		this.chase.snap( this.surfer );
-		this.walker = new Walker( this.scene, this.port );
+		this.walker = new Walker( this.scene );
 		this.walkCam = new WalkCamera( this.camera, this.input, this.port.cameraObstacles );
 		this.npcs = new Npcs( this.scene, this.port, this.sea );
 		this.dialogue = new Dialogue();
@@ -103,6 +104,7 @@ export class App {
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.leviathans = new Leviathans( this.scene, this.sea );
 		this.galleon = new Galleon( this.scene, this.sea );
+		this.walkCam.obstacles = [ ...this.port.cameraObstacles, ...this.galleon.cameraObstacles ];
 		this.song = new WhaleSong( this.audio, this.leviathans );
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
 		this.creditsEl = document.getElementById( 'credits' );
@@ -168,12 +170,14 @@ export class App {
 
 	}
 
-	// step up onto the deck at `spot`; the board stays floating where you left it
+	// step up onto a platform (the boardwalk or the galleon's deck) at `spot` ( { platform, x, z } in the
+	// platform's coordinates), facing away from the board; the board stays floating where you left it
 	dock( spot ) {
 
-		const s = this.surfer;
+		const s = this.surfer, pf = spot.platform;
 		s.velocity.set( 0, 0, 0 );
-		this.walker.place( spot.x, spot.z, Math.atan2( spot.x - s.position.x, spot.z - s.position.z ) );
+		const w = pf.toWorld( new THREE.Vector3( spot.x, pf.deckY, spot.z ), new THREE.Vector3() );
+		this.walker.place( pf, spot.x, spot.z, Math.atan2( w.x - s.position.x, w.z - s.position.z ) - pf.yaw );
 		this.setMode( 'walk' );
 
 	}
@@ -228,6 +232,7 @@ export class App {
 		this.port.update( dt, WIND.angle );
 		this.leviathans.update( dt );
 		this.galleon.update( dt );
+		if ( this.onFoot ) this.walker.sync(); // the deck may have moved under you
 		this.song.update( dt, this.camera.position );
 		this.audio.update( this.camera );
 		this.spotPod();
@@ -288,7 +293,7 @@ export class App {
 			// slow near a mooring buoy: talk from the board; near any deck edge: step up
 			const s = this.surfer;
 			const npc = this.npcs.nearestMooring( s.position );
-			const spot = npc ? null : this.port.dockPoint( s.position.x, s.position.z );
+			const spot = npc ? null : this.port.dockPoint( s.position.x, s.position.z ) || this.galleon.dockPoint( s.position.x, s.position.z );
 			if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
@@ -296,20 +301,27 @@ export class App {
 
 			} else if ( spot ) {
 
-				prompt = 'E · step onto the dock';
+				prompt = spot.platform === this.galleon.platform ? 'E · climb aboard' : 'E · step onto the dock';
 				if ( e ) this.dock( spot );
 
 			}
 
 		} else if ( this.mode === 'walk' ) {
 
-			const w = this.walker.position;
-			const npc = this.npcs.nearest( w );
-			const edge = npc ? null : this.port.launchEdge( w.x, w.z );
+			const wk = this.walker, w = wk.position;
+			const onShip = wk.platform === this.galleon.platform;
+			const npc = onShip ? null : this.npcs.nearest( w );
+			const crew = onShip && this.galleon.crewPosition().distanceTo( w ) < 2.8;
+			const edge = npc || crew ? null : wk.platform.launchEdge( wk.local.x, wk.local.z );
 			if ( npc ) {
 
 				prompt = `E · talk to the ${ npc.name.toLowerCase() }`;
 				if ( e ) this.talkTo( npc );
+
+			} else if ( crew ) {
+
+				prompt = 'E · talk to the quartermaster';
+				if ( e ) this.dialogue.open( QUARTERMASTER.name, QUARTERMASTER.lines );
 
 			} else if ( edge ) {
 

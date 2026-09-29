@@ -1,20 +1,23 @@
 import * as THREE from 'three/webgpu';
 import { buildFigure, animateFigure } from './Figure.js';
-import { DECK_Y } from '../world/Port.js';
 
 const WALK = 4.5; // m/s
 const RUN = 8;
-const DECK_TOP = DECK_Y + 0.5; // the deck's walking surface
+const _dir = new THREE.Vector3();
 
-// On-foot mode on the dock: WASD relative to the camera heading, Shift to run, kept on the
-// boardwalk and piers by port.walkable() (each axis tried separately, so you slide along edges).
+// On-foot mode: WASD relative to the camera heading, Shift to run. The walker stands on a *platform*
+// (the port's boardwalk, the galleon's deck): { walkable( lx, lz ), deckY, yaw, toWorld( local, out ),
+// launchEdge( lx, lz ) }. Position is kept in the platform's own coordinates, so a moving deck carries
+// you; `position` is the world position, refreshed each frame. Each axis is tried separately, so you
+// slide along rails and walls.
 export class Walker {
 
-	constructor( scene, port ) {
+	constructor( scene ) {
 
-		this.port = port;
-		this.position = new THREE.Vector3();
-		this.yaw = 0; // facing: ( sin yaw, 0, cos yaw )
+		this.platform = null;
+		this.local = new THREE.Vector3();
+		this.position = new THREE.Vector3(); // world
+		this.yaw = 0; // facing on the platform: ( sin yaw, 0, cos yaw ) in platform coordinates
 		this.phase = 0;
 		this.moving = 0;
 		this.figure = buildFigure( { coat: 0x2c4a6b } );
@@ -23,9 +26,11 @@ export class Walker {
 
 	}
 
-	place( x, z, yaw ) {
+	// stand on `platform` at local ( lx, lz ), facing local yaw
+	place( platform, lx, lz, yaw ) {
 
-		this.position.set( x, DECK_TOP, z );
+		this.platform = platform;
+		this.local.set( lx, platform.deckY, lz );
 		this.yaw = yaw;
 		this.sync();
 
@@ -37,21 +42,22 @@ export class Walker {
 
 	}
 
-	// move: { forward: -1..1, right: -1..1, run: bool }; camYaw: the camera's heading
+	// move: { forward: -1..1, right: -1..1, run: bool }; camYaw: the camera's heading (world)
 	update( dt, { forward = 0, right = 0, run = false }, camYaw ) {
 
 		const len = Math.hypot( forward, right );
 		let target = 0;
 		if ( len > 0 ) {
 
-			// camera-relative direction: forward is ( -sin camYaw, -cos camYaw ) for a camera looking down -z
+			// camera-relative direction in the world (camera looks down its -z), then into platform coordinates
 			const fx = - Math.sin( camYaw ), fz = - Math.cos( camYaw );
-			const rx = - fz, rz = fx;
-			const dx = ( fx * forward + rx * right ) / len, dz = ( fz * forward + rz * right ) / len;
+			const wx = ( fx * forward - fz * right ) / len, wz = ( fz * forward + fx * right ) / len;
+			const py = this.platform.yaw, c = Math.cos( py ), s = Math.sin( py );
+			const dx = wx * c - wz * s, dz = wx * s + wz * c;
 			const step = ( run ? RUN : WALK ) * dt;
-			const p = this.position;
-			if ( this.port.walkable( p.x + dx * step, p.z ) ) p.x += dx * step;
-			if ( this.port.walkable( p.x, p.z + dz * step ) ) p.z += dz * step;
+			const p = this.local;
+			if ( this.platform.walkable( p.x + dx * step, p.z ) ) p.x += dx * step;
+			if ( this.platform.walkable( p.x, p.z + dz * step ) ) p.z += dz * step;
 
 			// turn smoothly toward the walking direction
 			const want = Math.atan2( dx, dz );
@@ -66,10 +72,13 @@ export class Walker {
 
 	}
 
+	// refresh the world position (call every frame: the platform may be moving)
 	sync() {
 
+		if ( ! this.platform ) return;
+		this.platform.toWorld( _dir.copy( this.local ), this.position );
 		this.figure.position.copy( this.position );
-		this.figure.rotation.y = this.yaw;
+		this.figure.rotation.y = this.platform.yaw + this.yaw;
 		animateFigure( this.figure, this.phase, this.moving );
 
 	}
