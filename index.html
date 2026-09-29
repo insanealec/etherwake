@@ -17,8 +17,10 @@
 		#credits.pop { animation: pop .35s ease-out; }
 		@keyframes pop { 0% { transform: scale( 1.25 ); } 100% { transform: scale( 1 ); } }
 		#objective { position: fixed; left: 0; right: 0; top: 12px; text-align: center; font-size: 17px; color: #bff4ee; text-shadow: 0 0 8px #1a8f8a, 0 1px 2px #000; opacity: 0; transition: opacity .3s; pointer-events: none; }
-		#objective .arrow { display: inline-block; margin-right: 8px; transition: transform .1s linear; }
+		#objective .arrow { width: 30px; height: 40px; vertical-align: middle; margin-right: 10px; transition: transform .1s linear; overflow: visible; }
+		#objective .arrow path { fill: currentColor; stroke: #0b2b2a; stroke-width: 1.5; stroke-linejoin: round; filter: drop-shadow( 0 0 4px #1a8f8a ); }
 		#objective.urgent { color: #ffb0a0; text-shadow: 0 0 8px #c0402a, 0 1px 2px #000; }
+		#objective.urgent .arrow path { filter: drop-shadow( 0 0 4px #c0402a ); }
 		#dialogue .choices { margin-top: 10px; color: #ffcf8a; font-size: 15px; letter-spacing: .04em; white-space: pre; }
 		#dialogue .choices:empty { display: none; }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
@@ -29,7 +31,7 @@
 	<div id="toast"></div>
 	<div id="prompt"></div>
 	<div id="dialogue"><div class="name"></div><div class="text"></div><div class="choices"></div></div>
-	<div id="objective"><span class="arrow">▲</span><span class="label"></span></div>
+	<div id="objective"><svg class="arrow" viewBox="-12 -16 24 32" aria-hidden="true"><path d="M0 -15 L10 9 L0 3 L-10 9 Z" /></svg><span class="label"></span></div>
 	<div id="hud">Click to look &middot; WASD move &middot; Space/C up/down &middot; Shift fast &middot; Esc release &middot; H tweaks</div>
 	<script type="module" src="/src/main.js"></script>
 </body>
