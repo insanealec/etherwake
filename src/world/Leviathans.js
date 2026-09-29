@@ -77,15 +77,18 @@ function whaleGeometry() {
 
 		const g = new THREE.ShapeGeometry( new THREE.Shape( pts.map( ( [ x, y ] ) => new THREE.Vector2( x, y ) ) ) );
 		g.rotateX( Math.PI / 2 ); // outline y -> +z
-		const p = g.attributes.position, al = [], fn = [];
-		for ( let i = 0; i < p.count; i ++ ) {
-
-			al.push( 0.5 - p.getZ( i ) );
-			fn.push( finSpan ? Math.min( 1, Math.abs( p.getX( i ) ) / finSpan ) : 0 );
-
-		}
-		g.setAttribute( 'along', new THREE.Float32BufferAttribute( al, 1 ) );
+		const p = g.attributes.position, fn = [];
+		for ( let i = 0; i < p.count; i ++ ) fn.push( finSpan ? Math.min( 1, Math.abs( p.getX( i ) ) / finSpan ) : 0 );
+		g.setAttribute( 'along', new THREE.Float32BufferAttribute( new Float32Array( p.count ), 1 ) );
 		g.setAttribute( 'fin', new THREE.Float32BufferAttribute( fn, 1 ) );
+		return g;
+
+	};
+	// `along` from the final position, so a part moves with the stretch of body it's attached to
+	const setAlong = ( g ) => {
+
+		const p = g.attributes.position, al = g.attributes.along;
+		for ( let i = 0; i < p.count; i ++ ) al.setX( i, 0.5 - p.getZ( i ) );
 		return g;
 
 	};
@@ -101,13 +104,14 @@ function whaleGeometry() {
 		// fin weight: distance out from the body
 		const p = g.attributes.position, fn = g.attributes.fin;
 		for ( let i = 0; i < p.count; i ++ ) fn.setX( i, Math.min( 1, Math.max( 0, ( Math.abs( p.getX( i ) ) - rFin ) / 0.4 ) ) );
-		return g;
+		return setAlong( g );
 
 	} );
 
 	// flukes: a wide notched tail, horizontal
 	const fluke = flat( [ [ 0, 0.03 ], [ 0.22, - 0.06 ], [ 0.2, - 0.12 ], [ 0.05, - 0.08 ], [ 0, - 0.1 ], [ - 0.05, - 0.08 ], [ - 0.2, - 0.12 ], [ - 0.22, - 0.06 ] ], 0 );
 	fluke.translate( 0, 0, - 0.47 );
+	setAlong( fluke );
 
 	const geo = mergeGeometries( [ body, ...fins, fluke ] );
 	geo.computeBoundingSphere();
