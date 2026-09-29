@@ -174,6 +174,12 @@
   floating raft at the Reach's heart riding the swell, lantern mast, awnings, a mooring buoy, and the
   **Outpost trader** (`TRADER` in Characters) who opens the same shop as the shipwright (upgrades and
   the galleon deed).
+- **Save safety (2026-09-29):** the user saw upgrades "reset sometimes". Cause: my automated tests called
+  `save.reset()` in the shared browser pane (the user plays there too), and tabs overwrote each other.
+  Fixes: `__ew.testMode()` (a throwaway `etherwake.save.v1.test` slot and audio off, for that page session
+  only; call it first in every test script; see CLAUDE.md); `Save` listens for the `storage` event and
+  adopts another tab's newer save (`onExternal` re-applies upgrades). The stored `etherwake.noAudio` flag
+  is no longer used in the pane (it muted the user's game too); navigate with `?noAudio` instead.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

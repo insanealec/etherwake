@@ -37,7 +37,7 @@ export class Audio {
 
 		const start = ( e ) => {
 
-			if ( ! e.isTrusted || this.ctx ) return;
+			if ( ! e.isTrusted || this.ctx || this.disabled ) return;
 			this.start();
 
 		};
@@ -77,6 +77,19 @@ export class Audio {
 
 		console.info( '[etherwake] audio started' );
 		for ( const fn of this.onStart ) fn( ctx );
+
+	}
+
+	// Automated tests: silence for the rest of this page session (not remembered)
+	disableForSession() {
+
+		this.disabled = true;
+		if ( this.ctx ) {
+
+			this.master.gain.value = 0;
+			this.ctx.suspend();
+
+		}
 
 	}
 

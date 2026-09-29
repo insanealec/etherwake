@@ -52,6 +52,13 @@ export class App {
 		this.save = new Save();
 		this.audio = new Audio( this.params );
 		applyUpgrades( this.save.data.upgrades );
+		// another tab saved (or a slot switch): take its upgrades too
+		this.save.onExternal( ( d ) => {
+
+			applyUpgrades( d.upgrades );
+			this.tweaks?.gui.controllersRecursive().forEach( ( c ) => c.updateDisplay() );
+
+		} );
 
 		this.renderer = new THREE.WebGPURenderer( { antialias: true } );
 		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
@@ -125,6 +132,16 @@ export class App {
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
+
+	}
+
+	// For automated tests, first thing on every page load: a throwaway save slot and no audio, for this
+	// page session only (the player's real save and audio settings are untouched). __ew.testMode()
+	testMode() {
+
+		this.save.useSlot( 'test' );
+		this.audio.disableForSession();
+		return 'test mode: save slot "test", audio off';
 
 	}
 
