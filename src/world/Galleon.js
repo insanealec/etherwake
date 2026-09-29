@@ -24,7 +24,9 @@ export const SHIP = {
 	turnRate: 0.35, // rudder turn rate at speed (rad/s)
 	turnSpeed: 6, // below this speed the rudder has less bite
 	slope: 0.25, // how much the swell's slope pushes the ship
-	sailRate: 0.5 // how fast W/S let out and take in sail (fraction per second)
+	sailRate: 0.5, // how fast W/S let out and take in sail (fraction per second)
+	solar: 0.6 // starlight in the solar sails: this share of full push on any heading, even into the
+	// wind (~20 m/s there); the wind adds more on good points of sail (~30 m/s on a beam reach)
 };
 
 const HALF = SHIP.length / 2, W = SHIP.beam / 2;
@@ -439,7 +441,9 @@ export class Galleon {
 		g.rotation.y -= this.wheel * S.turnRate * Math.min( 1, 0.15 + speed / S.turnSpeed ) * dt;
 
 		const fx = Math.sin( g.rotation.y ), fz = Math.cos( g.rotation.y );
-		const push = S.thrust * sailPower( g.rotation.y, this.sailState ).efficiency * this.sail;
+		const eff = sailPower( g.rotation.y, this.sailState ).efficiency;
+		this.solarOnly = eff < S.solar;
+		const push = S.thrust * Math.max( S.solar, eff ) * this.sail;
 		const n = this.sea.normalAt( g.position.x, g.position.z );
 		v.x += ( fx * push + n.x * 12 * S.slope ) * dt;
 		v.z += ( fz * push + n.z * 12 * S.slope ) * dt;

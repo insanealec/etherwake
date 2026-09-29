@@ -159,6 +159,10 @@
   (900 m, fog-free, fades up close) that sits under the sun seen from the harbour. App: toasts, and
   riding a front pays +15 every 3 s (`REWARDS.flare*`). Holding W on the board you slowly outrun the
   front (~23 vs 22 m/s), so holding its face means easing off.
+  User: the galleon stalled sailing into the wind toward the Reach ("weak for such a huge ship"). Added a
+  **solar drive** (`SHIP.solar` 0.6): starlight in the sails gives that share of full push on any heading;
+  the wind adds more on good points of sail (`push = thrust * max( solar, windEfficiency ) * sail`).
+  Dead upwind ~21 m/s (HUD says "solar drive"), beam ~30; anchorage to the Reach in ~94 s at ~26 m/s.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
