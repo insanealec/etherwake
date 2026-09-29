@@ -78,6 +78,9 @@
   plane going forward inside the ring (offset from the centre decides the boost). Per-type lifts in
   `RACE.lift`. Medal times re-set from an autopilot that hits every boost and jumps every air gate
   (loop ~68 s, crest ~125 s): gold 62 / 115, silver 76 / 140.
+  Then the user found jump gates unfun: gate types were removed. **Every gate** now sits at rider height
+  with the teal sweet-spot disc and boosts you if you cross its centre (`RACE.lift`, `boostRadius`,
+  `boostSpeed`). Autopilot hitting every centre: loop ~65 s, crest ~117 s; gold 60 / 108, silver 72 / 130.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

@@ -1,20 +1,15 @@
 import * as THREE from 'three/webgpu';
-import { uniform, uv, vec3, smoothstep, float, length, positionWorld, cameraPosition } from 'three/tsl';
+import { uv, vec3, smoothstep, float, length, positionWorld, cameraPosition } from 'three/tsl';
 import { COURSES, RACE } from './Races.js';
 import { HARBOR } from '../world/WorldLayout.js';
 
 const DEG = Math.PI / 180;
 
-// glow colours per gate type while it's the next gate
-const LIT = {
-	gate: new THREE.Color( 3.0, 1.7, 0.45 ), // gold
-	boost: new THREE.Color( 0.4, 2.6, 2.4 ), // teal
-	air: new THREE.Color( 3.0, 0.8, 1.4 ) // rose
-};
+const LIT = new THREE.Color( 3.0, 1.7, 0.45 ); // the next gate's glow (gold)
 
-// A race in progress: brass ring gates standing on the swell; the next one glows (gold, teal for a
-// boost gate, rose for an air gate) with a beacon, the one after is faintly lit. Boost gates have a
-// glowing centre disc: pass through it for a burst of speed. The clock starts at the first gate.
+// A race in progress: brass ring gates standing on the swell; the next one glows gold with a beacon,
+// the one after is faintly lit. Every gate has a glowing centre disc: cross through it for a burst of
+// speed. The clock starts at the first gate.
 // A gate counts when you cross its plane going forward inside the ring (missed? loop back round).
 // update() returns 'start', 'gate' or 'finish'; `boosted` is set on the frame a boost fires.
 export class Race {
@@ -24,14 +19,8 @@ export class Race {
 		this.sea = sea;
 		this.state = 'idle'; // 'idle' | 'running'
 		this.brass = new THREE.MeshStandardNodeMaterial( { color: 0xb8863b, metalness: 0.85, roughness: 0.35 } );
-		this.lit = {};
-		this.dim = {};
-		for ( const k in LIT ) {
-
-			this.lit[ k ] = new THREE.MeshBasicNodeMaterial( { color: LIT[ k ] } );
-			this.dim[ k ] = new THREE.MeshBasicNodeMaterial( { color: LIT[ k ].clone().multiplyScalar( 0.25 ) } );
-
-		}
+		this.lit = new THREE.MeshBasicNodeMaterial( { color: LIT } );
+		this.dim = new THREE.MeshBasicNodeMaterial( { color: LIT.clone().multiplyScalar( 0.25 ) } );
 		// the boost sweet spot: a soft additive disc inside the ring
 		this.discMat = new THREE.MeshBasicNodeMaterial( { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide } );
 		this.discMat.colorNode = vec3( 0.15, 1.1, 1.0 ).mul( smoothstep( float( 0.5 ), float( 0.1 ), length( uv().sub( 0.5 ) ) ) );
@@ -43,8 +32,7 @@ export class Race {
 
 		this.beamMat = new THREE.MeshBasicNodeMaterial( { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide } );
 		const near = smoothstep( 20, 120, length( positionWorld.xz.sub( cameraPosition.xz ) ) );
-		this.uBeam = uniform( new THREE.Color() ); // set per gate type in restyle()
-		this.beamMat.colorNode = this.uBeam.mul( 0.2 ).mul( smoothstep( float( 1 ), float( 0 ), uv().y ) ).mul( near.mul( 0.8 ).add( 0.2 ) );
+		this.beamMat.colorNode = vec3( LIT.r, LIT.g, LIT.b ).mul( 0.2 ).mul( smoothstep( float( 1 ), float( 0 ), uv().y ) ).mul( near.mul( 0.8 ).add( 0.2 ) );
 		const beamGeo = new THREE.CylinderGeometry( 0.8, 0.8, 80, 12, 1, true );
 		beamGeo.translate( 0, 40, 0 );
 		this.beacon = new THREE.Mesh( beamGeo, this.beamMat );
@@ -57,19 +45,18 @@ export class Race {
 
 		this.course = COURSES.find( ( c ) => c.id === id );
 		this.group.clear();
-		const pts = this.course.gates.map( ( [ a, r, type = 'gate' ] ) => ( { x: HARBOR.x + Math.cos( a * DEG ) * r, z: HARBOR.z + Math.sin( a * DEG ) * r, type } ) );
+		const pts = this.course.gates.map( ( [ a, r ] ) => ( { x: HARBOR.x + Math.cos( a * DEG ) * r, z: HARBOR.z + Math.sin( a * DEG ) * r } ) );
 		this.gates = pts.map( ( p, i ) => {
 
 			// face along the course: from the previous gate to the next
 			const from = pts[ Math.max( 0, i - 1 ) ], to = pts[ Math.min( pts.length - 1, i + 1 ) ];
 			const mesh = new THREE.Group();
 			const ring = new THREE.Mesh( this.ringGeo, this.brass );
-			mesh.add( ring );
-			if ( p.type === 'boost' ) mesh.add( new THREE.Mesh( this.discGeo, this.discMat ) );
+			mesh.add( ring, new THREE.Mesh( this.discGeo, this.discMat ) );
 			mesh.position.set( p.x, 0, p.z );
 			mesh.rotation.y = Math.atan2( to.x - from.x, to.z - from.z );
 			this.group.add( mesh );
-			return { ...p, mesh, ring, lift: RACE.lift[ p.type ] };
+			return { ...p, mesh, ring };
 
 		} );
 		this.next = 0;
@@ -93,7 +80,7 @@ export class Race {
 		this.gates.forEach( ( g, i ) => {
 
 			g.mesh.visible = i >= this.next;
-			g.ring.material = i === this.next ? this.lit[ g.type ] : i === this.next + 1 ? this.dim[ g.type ] : this.brass;
+			g.ring.material = i === this.next ? this.lit : i === this.next + 1 ? this.dim : this.brass;
 
 		} );
 		const g = this.gates[ this.next ];
@@ -101,7 +88,6 @@ export class Race {
 		if ( g ) {
 
 			this.beacon.position.set( g.x, 0, g.z );
-			this.uBeam.value.copy( LIT[ g.type ] );
 
 		}
 
@@ -114,11 +100,11 @@ export class Race {
 		if ( this.started ) this.time += dt;
 
 		// gates ride the swell
-		for ( const g of this.gates ) g.mesh.position.y = this.sea.heightAt( g.x, g.z ) + g.lift;
-		this.beacon.position.y = this.gates[ this.next ].mesh.position.y - this.gates[ this.next ].lift;
+		for ( const g of this.gates ) g.mesh.position.y = this.sea.heightAt( g.x, g.z ) + RACE.lift;
+		this.beacon.position.y = this.gates[ this.next ].mesh.position.y - RACE.lift;
 
 		// a gate counts when you cross its plane going forward, inside the ring; how far from the centre
-		// you cross decides the boost (plain and boost gates get a little slack at the rim)
+		// you cross decides the boost (a little slack at the rim)
 		const g = this.gates[ this.next ], p = surfer.position;
 		const nx = Math.sin( g.mesh.rotation.y ), nz = Math.cos( g.mesh.rotation.y );
 		const rx = p.x - g.x, rz = p.z - g.z;
@@ -127,9 +113,9 @@ export class Race {
 		g.side = side;
 		if ( ! crossed ) return null;
 		const offset = Math.hypot( rx * nz - rz * nx, ( p.y + 0.8 ) - g.mesh.position.y );
-		if ( offset > RACE.gateRadius + ( g.type === 'air' ? 0 : 1 ) ) return null;
+		if ( offset > RACE.gateRadius + 1 ) return null;
 
-		if ( g.type === 'boost' && offset < RACE.boostRadius ) {
+		if ( offset < RACE.boostRadius ) {
 
 			const s = Math.sin( surfer.yaw ), c = Math.cos( surfer.yaw );
 			surfer.velocity.x += s * RACE.boostSpeed;
@@ -160,8 +146,7 @@ export class Race {
 
 		if ( this.state !== 'running' ) return null;
 		const g = this.gates[ this.next ];
-		const kind = g.type === 'boost' ? ' · boost' : g.type === 'air' ? ' · jump it' : '';
-		return { label: `${ this.course.name } · gate ${ this.next + 1 }/${ this.gates.length }${ kind }`, x: g.x, z: g.z };
+		return { label: `${ this.course.name } · gate ${ this.next + 1 }/${ this.gates.length }`, x: g.x, z: g.z };
 
 	}
 
