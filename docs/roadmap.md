@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 5, the loop (slices 1-4 done: credits, stardust, tricks, save, courier jobs, shop, races). Milestone 4 done.
+- **Current milestone:** 6, leviathans (slice 1 done: star-whale pod swimming and breaching). Milestone 5 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -81,6 +81,17 @@
   Then the user found jump gates unfun: gate types were removed. **Every gate** now sits at rider height
   with the teal sweet-spot disc and boosts you if you cross its centre (`RACE.lift`, `boostRadius`,
   `boostSpeed`). Autopilot hitting every centre: loop ~65 s, crest ~117 s; gold 60 / 108, silver 72 / 130.
+- **Milestone 6 slice 1 (2026-09-28):** the user likes the whale-leviathans of Death Stranding and the
+  space whale of Beyond Good & Evil (ours is original). `src/world/Leviathans.js`: a procedural unit-length
+  whale (lofted body with a blunt head and long taper, swept wing-like pectoral fins, notched flukes;
+  merged, with `along` and `fin` attributes), `MeshStandardNodeMaterial` with a TSL swim wave travelling
+  to the tail and slow fin beats; emissive skin: patches that are windows onto the cosmos (nebula and
+  `starLayer` from `Starfield`, now exported, sampled along the view direction), glowing freckles, cyan
+  flank stripes with pulses running nose to tail, gold eyes, a cyan rim aura. A pod (`POD`: 64 m, 52 m and
+  a 26 m calf) swims `MIGRATION` (an ellipse 560 x 460 m around the harbour, 11 m/s in `WorldLayout`)
+  with backs breaking the gas, gently bobbing, and each breaches every 35 to 70 s (9 s arc, a third of a
+  body length up, pitched to match). **Testing note:** the pane often hides; screenshots are stale then.
+  Let the real loop run, place the fly camera, wait, then screenshot.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -144,10 +155,11 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 5 is feature-complete: get the user's play-test (race medal times, shop prices, payouts all
-live in `game/`). Candidate polish: sail colour per upgrade tier; a rival racer; a small stats page.
-Then **milestone 6 (leviathans)**: star-whale pods (procedural or an openly licensed model with
-vertex-shader swimming), riding their bow wave, song audio (add `?noAudio` before any sound), breaching.
+Milestone 6 slice 2: **ride the bow wave** (add a moving swell source ahead of and beside each whale to
+both wave functions, JS and TSL, so the surfer can catch it; maybe a breach splash ring that throws the
+board). Slice 3: **song** (the first audio: add `?noAudio` and use it for every automated run; WebAudio,
+procedural or a CC0 Freesound recording listed in `CREDITS.md`), plus a pod-sighting toast and maybe a
+bonus for riding with them.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

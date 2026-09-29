@@ -4,7 +4,7 @@ import { Fn, vec3, float, floor, fract, sin, dot, length, smoothstep, mix, pow, 
 const hash3 = Fn( ( [ p ] ) => fract( sin( dot( p, vec3( 127.1, 311.7, 74.7 ) ) ).mul( 43758.5453 ) ) );
 
 // One layer of stars: the view direction is split into 3D cells, some cells get a star.
-const starLayer = Fn( ( [ dir, scale, density ] ) => {
+export const starLayer = Fn( ( [ dir, scale, density ] ) => {
 
 	const p = dir.mul( scale );
 	const cell = floor( p );

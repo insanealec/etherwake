@@ -21,6 +21,7 @@ import { Dialogue } from './ui/Dialogue.js';
 import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
+import { Leviathans } from './world/Leviathans.js';
 import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
@@ -96,6 +97,7 @@ export class App {
 		this.toastEl = document.getElementById( 'toast' );
 		this.promptEl = document.getElementById( 'prompt' );
 		this.stardust = new Stardust( this.scene, this.sea );
+		this.leviathans = new Leviathans( this.scene, this.sea );
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
 		this.creditsEl = document.getElementById( 'credits' );
 		this.objectiveEl = document.getElementById( 'objective' );
@@ -215,6 +217,7 @@ export class App {
 		}
 		this.npcs.update( dt, this.onFoot ? this.walker.position : this.surfer.position );
 		this.port.update( dt, WIND.angle );
+		this.leviathans.update( dt );
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
 		this.onRace( this.race.update( dt, this.surfer ) );
