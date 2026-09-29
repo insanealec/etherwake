@@ -19,6 +19,12 @@ export const CHARACTERS = [
 		]
 	},
 	{
+		id: 'marshal', name: 'Race marshal', shack: 6, coat: 0x7a1f2b, hat: 0xd9c9a3,
+		lines: [
+			'Fancy yourself quick? Gates are set, clock\'s wound. Pick a course.'
+		]
+	},
+	{
 		id: 'tea', name: 'Tea-seller', shack: 1, coat: 0x2f5a52, hat: 0x7a2a35,
 		lines: [
 			'Nebula tea? Steeped in etherium. Tastes like a sunrise, mostly.',

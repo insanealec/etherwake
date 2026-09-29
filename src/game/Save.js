@@ -2,7 +2,7 @@
 // so every access is wrapped and the game runs fine without it.
 const KEY = 'etherwake.save.v1';
 
-const DEFAULTS = { credits: 0, upgrades: {}, stats: { stardust: 0, tricks: 0, bestAir: 0 } };
+const DEFAULTS = { credits: 0, upgrades: {}, races: {}, stats: { stardust: 0, tricks: 0, bestAir: 0 } };
 
 export class Save {
 

@@ -22,11 +22,16 @@ import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
 import { Courier } from './game/Courier.js';
+import { Race } from './game/Race.js';
+import { COURSES, RACE } from './game/Races.js';
 import { UPGRADES, applyUpgrades, tierName } from './game/Gear.js';
 import { SPAWN } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
 import { Input } from './core/Input.js';
+
+// seconds -> m:ss.t
+const formatTime = ( t ) => `${ Math.floor( t / 60 ) }:${ ( t % 60 ).toFixed( 1 ).padStart( 4, '0' ) }`;
 
 // Top-level app: owns the renderer, scene, camera and the frame loop.
 // Systems are added here as milestones land (see docs/roadmap.md).
@@ -95,6 +100,7 @@ export class App {
 		this.creditsEl = document.getElementById( 'credits' );
 		this.objectiveEl = document.getElementById( 'objective' );
 		this.courier = new Courier( this.scene, this.sea, this.surfer );
+		this.race = new Race( this.scene, this.sea );
 		const dockmaster = this.npcs.list.find( ( n ) => n.id === 'dockmaster' );
 		this.courier.dropoff = dockmaster.buoy.position;
 		this.atDropoff = ( p ) => Math.hypot( p.x - dockmaster.buoy.position.x, p.z - dockmaster.buoy.position.z ) < 7;
@@ -211,6 +217,7 @@ export class App {
 		this.port.update( dt, WIND.angle );
 		if ( ! this.onFoot ) this.stardust.update( dt, this.surfer );
 		this.onCourier( this.courier.update( dt, this.surfer, this.onFoot ? () => false : this.atDropoff ) );
+		this.onRace( this.race.update( dt, this.surfer ) );
 		this.wake.update( dt, this.surfer );
 		this.spray.update( dt, this.surfer );
 
@@ -295,6 +302,7 @@ export class App {
 	talkTo( npc ) {
 
 		if ( npc.id === 'shipwright' ) return this.openShop( npc );
+		if ( npc.id === 'marshal' ) return this.openRaces( npc );
 		if ( npc.id !== 'dockmaster' ) return this.dialogue.open( npc.name, npc.lines );
 		const c = this.courier;
 		if ( c.state !== 'idle' ) {
@@ -361,6 +369,69 @@ export class App {
 
 	}
 
+	// The race marshal: pick a course (1, 2, ...) with your best time and the medal times, or Q.
+	// Mid-race, talking offers to abandon it.
+	openRaces( npc ) {
+
+		if ( this.race.state === 'running' ) {
+
+			return this.dialogue.open( npc.name, [ "You're mid-race! The gates won't wait." ], [
+				{ key: 'KeyE', label: 'E · back to it' },
+				{ key: 'KeyQ', label: 'Q · abandon the race', action: () => {
+
+					this.race.stop();
+					this.toast( 'Race abandoned' );
+
+				} }
+			] );
+
+		}
+		const choices = COURSES.map( ( c, i ) => {
+
+			const best = this.save.data.races[ c.id ];
+			const bestText = best ? `best ${ formatTime( best ) }` : 'no time yet';
+			return {
+				key: `Digit${ i + 1 }`,
+				label: `${ i + 1 } · ${ c.name } · ${ c.gates.length } gates · ${ bestText } · gold ${ formatTime( c.gold ) }, silver ${ formatTime( c.silver ) }`,
+				action: () => {
+
+					if ( this.courier.state !== 'idle' ) this.courier.abandon();
+					this.race.start( c.id );
+					this.toast( `${ c.name } · ride through the first gate to start the clock` );
+
+				}
+			};
+
+		} );
+		choices.push( { key: 'KeyQ', label: 'Q · not now' } );
+		this.dialogue.open( npc.name, npc.lines, choices );
+
+	}
+
+	onRace( event ) {
+
+		if ( event === 'start' ) this.toast( 'Go!' );
+		else if ( event === 'gate' ) this.spray.burst( this.surfer, 10 );
+		else if ( event === 'finish' ) {
+
+			const c = this.race.course, t = this.race.time, P = RACE.pay;
+			const prev = this.save.data.races[ c.id ];
+			const medal = t <= c.gold ? 'gold' : t <= c.silver ? 'silver' : null;
+			let pay = medal ? P[ medal ] : P.finish;
+			const best = ! prev || t < prev;
+			if ( best ) {
+
+				if ( prev ) pay += RACE.bestBonus;
+				this.save.data.races[ c.id ] = +t.toFixed( 2 );
+
+			}
+			this.save.addCredits( pay );
+			this.toast( `${ c.name } · ${ formatTime( t ) }${ medal ? ` · ${ medal }!` : '' }${ best ? ' · new best' : '' } · +${ pay } ✦` );
+
+		}
+
+	}
+
 	onCourier( event ) {
 
 		if ( event === 'picked' ) this.toast( 'Parcel aboard · back to the dockmaster' );
@@ -379,7 +450,8 @@ export class App {
 	// top-of-screen objective: an arrow toward the target (relative to the camera), distance and time
 	updateObjective() {
 
-		const t = this.courier.target;
+		const racing = this.race.state === 'running';
+		const t = racing ? this.race.target : this.courier.target;
 		if ( ! t ) {
 
 			if ( this.objectiveShown ) this.objectiveEl.style.opacity = 0;
@@ -390,8 +462,9 @@ export class App {
 		const cam = this.camera.position, f = this.camera.getWorldDirection( this._fwd || ( this._fwd = new THREE.Vector3() ) );
 		const dx = t.x - cam.x, dz = t.z - cam.z, d = Math.hypot( dx, dz );
 		const ang = Math.atan2( f.x * dz - f.z * dx, f.x * dx + f.z * dz ) * 180 / Math.PI;
-		const left = Math.max( 0, Math.ceil( this.courier.timeLeft ) );
-		const clock = `${ Math.floor( left / 60 ) }:${ String( left % 60 ).padStart( 2, '0' ) }`;
+		// races count up (from the first gate), courier jobs count down
+		const left = racing ? Infinity : Math.max( 0, Math.ceil( this.courier.timeLeft ) );
+		const clock = racing ? formatTime( this.race.time ) : `${ Math.floor( left / 60 ) }:${ String( left % 60 ).padStart( 2, '0' ) }`;
 		this.objectiveEl.querySelector( '.arrow' ).style.transform = `rotate( ${ ang.toFixed( 0 ) }deg )`;
 		const text = `${ t.label } · ${ Math.round( d ) } m · ${ clock }`;
 		if ( text !== this.objectiveText ) this.objectiveEl.querySelector( '.label' ).textContent = this.objectiveText = text;

@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 5, the loop (slices 1-3 done: credits, stardust, trick payouts, save, courier jobs, shop). Milestone 4 done.
+- **Current milestone:** 5, the loop (slices 1-4 done: credits, stardust, tricks, save, courier jobs, shop, races). Milestone 4 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -60,6 +60,15 @@
   `setLevel()`. `App.openShop()` / `buy()`: talk at the shipwright's mooring, 1-4 buys the next tier,
   Q leaves; the shop reopens with the shipwright's reply. `Dialogue` choices are generic keys now and
   list one per line when there are more than two.
+- **Milestone 5 slice 4 (2026-09-28):** races. `src/game/Races.js` (`COURSES` as polar gate lists around
+  the harbour with gold/silver times; `RACE` pay and gate size) and `src/game/Race.js` (brass ring gates
+  riding the swell 4 m up, facing along the course; the next gate glows gold with a beacon, the one
+  after is dimly lit; the clock starts at gate 1; `update()` returns 'start' / 'gate' / 'finish').
+  A fourth character, the **Race marshal** (shack 6), offers the courses with your best time and the
+  medal times; mid-race, talking offers to abandon. Finish pays 20, silver 40, gold 90, +15 for a new
+  best; best times saved in `save.data.races`. The objective HUD shows the race (gate n/N, distance,
+  running time) ahead of any courier job; starting a race abandons a courier job. Medal times set from a
+  straight-line autopilot run (loop ~75 s, crest ~127 s): gold 68 / 118, silver 85 / 150.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -123,9 +132,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 5 slice 4: **races** (a course of gates out on the swell against the clock, started from an
-NPC or a start buoy; best times saved; later a rival). Maybe show upgrades on the board (sail colour per
-tier). Then call milestone 5 done and look at milestone 6 (leviathans).
+Milestone 5 is feature-complete: get the user's play-test (race medal times, shop prices, payouts all
+live in `game/`). Candidate polish: sail colour per upgrade tier; a rival racer; a small stats page.
+Then **milestone 6 (leviathans)**: star-whale pods (procedural or an openly licensed model with
+vertex-shader swimming), riding their bow wave, song audio (add `?noAudio` before any sound), breaching.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
