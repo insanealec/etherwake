@@ -18,6 +18,8 @@ import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
 import { Dialogue } from './ui/Dialogue.js';
+import { Compass } from './ui/Compass.js';
+import { SeaMap } from './ui/SeaMap.js';
 import { QUARTERMASTER, TRADER, PILOT, STARGAZER } from './game/Characters.js';
 import { RINGS } from './game/Rings.js';
 import { Rings } from './world/Rings.js';
@@ -148,6 +150,8 @@ export class App {
 		this.stardust.onCollect = ( pos, trailDone ) => this.onStardust( pos, trailDone );
 		this.creditsEl = document.getElementById( 'credits' );
 		this.objectiveEl = document.getElementById( 'objective' );
+		this.compass = new Compass();
+		this.seaMap = new SeaMap();
 		this.courier = new Courier( this.scene, this.sea, this.surfer );
 		this.race = new Race( this.scene, this.sea );
 		const dockmaster = this.npcs.list.find( ( n ) => n.id === 'dockmaster' );
@@ -230,7 +234,7 @@ export class App {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
 			helm: 'A/D steer · W more sail · S less sail · E leave the helm · F fly · M mute · H tweaks',
-			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · M mute · H tweaks'
+			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · Tab map · M mute · H tweaks'
 		}[ mode ];
 
 	}
@@ -349,6 +353,8 @@ export class App {
 		if ( this.shells ) this.shells.update();
 		this.updateHud();
 		this.updateObjective();
+		if ( input.wasPressed( 'Tab' ) ) this.seaMap.toggle();
+		this.updateNavigation();
 		input.endFrame();
 		this.pipeline.render();
 
@@ -721,6 +727,48 @@ export class App {
 			this.save.addCredits( pay );
 			this.save.stat( 'jobs', ( n ) => n + 1 );
 			this.toast( `Delivered${ quick ? ' · quick bonus' : '' } · +${ pay } ✦` );
+
+		}
+
+	}
+
+	// Places worth finding, for the compass and the map
+	get places() {
+
+		const list = [ { name: 'Harbour', icon: '⚓', color: '#ffd08a', x: 0, z: 0 } ];
+		if ( this.save.data.ownsGalleon || this.save.data.foundGalleon ) {
+
+			const g = this.galleon.position;
+			list.push( { name: 'Galleon', icon: '⛵', color: '#ffb070', x: g.x, z: g.z } );
+
+		}
+		for ( const [ key, icon, color ] of [ [ 'flare', '☀', '#ff8a3a' ], [ 'rings', '❄', '#8ee8ff' ], [ 'rim', '◉', '#c08aff' ] ] ) {
+
+			const r = REGIONS[ key ];
+			list.push( { name: r.name.replace( /^the /, '' ).replace( /^./, ( ch ) => ch.toUpperCase() ), icon, color, x: r.x, z: r.z, radius: r.radius } );
+
+		}
+		return list;
+
+	}
+
+	// the compass strip (always) and the sea chart (Tab)
+	updateNavigation() {
+
+		const f = this.camera.getWorldDirection( this._nav || ( this._nav = new THREE.Vector3() ) );
+		const heading = ( Math.atan2( f.x, - f.z ) * 180 / Math.PI + 360 ) % 360;
+		const me = this.onFoot ? this.walker.position : this.mode === 'helm' ? this.galleon.position : this.surfer.position;
+		const places = this.places;
+		this.compass.update( heading, places, me );
+		if ( this.seaMap.open ) {
+
+			const pod = this.leviathans.whales[ 0 ].mesh.position;
+			this.seaMap.draw( {
+				regions: places.filter( ( p ) => p.radius ),
+				places: places.filter( ( p ) => ! p.radius ),
+				pod: { x: pod.x, z: pod.z },
+				player: { x: me.x, z: me.z, heading }
+			} );
 
 		}
 

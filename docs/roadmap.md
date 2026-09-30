@@ -208,6 +208,12 @@
   0.65 inside); 45 **void pearls** 7-13 m above the swell (+15, respawn 120 s); x2 pay; **Horizon Station**
   (`HORIZON`, the **Stargazer** `STARGAZER`: the shop). Measured: jumps 6.2 s of air at 0.55 gravity
   (too floaty), now 0.65.
+- **Navigation (2026-09-30):** `src/ui/Compass.js`: a bearing strip across the top (cardinals, ticks,
+  markers for the harbour, the galleon once found or owned, and the three regions, with distances; the
+  name shows when a marker is near the centre; off-strip markers pin to the edge, dimmed). `src/ui/SeaMap.js`:
+  Tab opens a round chart (north up, range rings every 2 km, region circles and names, harbour, galleon,
+  whale pod, your arrow). `App.places` / `App.updateNavigation`. The objective line moved down to 50 px;
+  `Input` swallows Tab's default focus change.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -271,9 +277,8 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's play-test of the Rim (ring waves, swirl, floatiness, pearls, the black hole's look). Then
-milestone 8's remaining polish: a title screen, performance work (LOD / dynamic resolution), and a GitHub
-Pages deploy. Maybe a map or compass showing the regions.
+Milestone 8's remaining polish: a title screen, performance work (LOD / dynamic resolution), and a GitHub
+Pages deploy.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

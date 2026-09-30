@@ -12,6 +12,7 @@ export class Input {
 
 		window.addEventListener( 'keydown', ( e ) => {
 
+			if ( e.code === 'Tab' ) e.preventDefault(); // the map, not focus changes
 			this.keys.add( e.code );
 			if ( ! e.repeat ) this.pressed.add( e.code );
 
