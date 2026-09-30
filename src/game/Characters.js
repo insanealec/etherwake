@@ -13,6 +13,12 @@ export const PILOT = {
 	greeting: 'Cold enough for you? The shards are mean but they pay: brush past them fast and you\'ll feel it. I stock the shipwright\'s gear, and I run the Shard Slalom round the spire.'
 };
 
+// at Horizon Station, in the Rim
+export const STARGAZER = {
+	id: 'stargazer', name: 'Stargazer',
+	greeting: 'Don\'t stare at it too long. The waves fall inward here, the current pulls you round, and you\'ll float like a feather off every crest. The pearls up high are worth the climb. Need gear?'
+};
+
 // aboard the solar galleon
 export const QUARTERMASTER = {
 	name: 'Quartermaster',

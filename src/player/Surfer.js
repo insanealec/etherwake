@@ -41,6 +41,7 @@ export class Surfer {
 		this.wipeout = 0; // seconds of tumble left
 		this.visualYaw = 0; // smoothed yaw for the model (so a revert swings round instead of snapping)
 		this.time = 0;
+		this.gravityScale = 1; // air gravity multiplier (the Rim is floaty)
 		this.sailState = {}; // sailPower() result for the current heading
 		this.boomSide = 1;
 
@@ -171,7 +172,7 @@ export class Surfer {
 
 		// vertical: ballistic, then resolve against the surface
 		const yPrev = p.y;
-		v.y -= B.airGravity * h;
+		v.y -= B.airGravity * this.gravityScale * h;
 		p.x += v.x * h;
 		p.y += v.y * h;
 		p.z += v.z * h;

@@ -5,8 +5,9 @@ import {
 	mx_fractal_noise_float, mx_noise_float
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
-import { HARBOR } from '../world/WorldLayout.js';
+import { HARBOR, REGIONS } from '../world/WorldLayout.js';
 import { FLARES, FLARE_TINT } from '../game/Flares.js';
+import { RIM } from '../game/Rim.js';
 
 // Harbour calm: swells shrink to HARBOR.calm near the port. Shared by the JS and TSL wave functions.
 const uHarbor = uniform( new THREE.Vector4( HARBOR.x, HARBOR.z, HARBOR.calmRadius, HARBOR.fadeRadius ) );
@@ -181,8 +182,37 @@ function flareHeight( p ) {
 }
 
 // everything that lifts the sea on top of the swell: leviathan bow waves and flare-fronts
-const extraHeight = ( p ) => bowHeight( p ).add( flareHeight( p ) );
-const extraHeightJS = ( x, z ) => bowHeightJS( x, z ) + flareHeightJS( x, z );
+// The Rim's infalling ring waves (milestone 8): concentric swells rolling in toward the centre, fading
+// out near the core and toward the region's edge. Shared by JS and TSL.
+const RK = 2 * Math.PI / RIM.ringLength, RW = RK * RIM.ringSpeed, RC = REGIONS.rim;
+function ringHeightJS( x, z, t ) {
+
+	const r = Math.hypot( x - RC.x, z - RC.z );
+	if ( r > RC.radius ) return 0;
+	const s = ( a, b, v ) => {
+
+		const k = Math.max( 0, Math.min( 1, ( v - a ) / ( b - a ) ) );
+		return k * k * ( 3 - 2 * k );
+
+	};
+	return RIM.ringAmp * Math.sin( RK * r + RW * t ) * s( RIM.inner, RIM.inner + 200, r ) * s( RC.radius, RC.radius * 0.7, r );
+
+}
+
+function ringHeight( p, t ) {
+
+	const r = length( p.sub( vec2( RC.x, RC.z ) ) );
+	return sin( r.mul( RK ).add( t.mul( RW ) ) ).mul( RIM.ringAmp )
+		.mul( smoothstep( RIM.inner, RIM.inner + 200, r ) ).mul( smoothstep( RC.radius, RC.radius * 0.7, r ) );
+
+}
+
+// how high the Rim's ring waves lift the surface at (x, z, t)
+export const ringHeightAt = ( x, z, t ) => ringHeightJS( x, z, t );
+
+// everything that lifts the sea on top of the swell: leviathan bow waves, flare-fronts, ring waves
+const extraHeight = ( p, t ) => bowHeight( p ).add( flareHeight( p ) ).add( ringHeight( p, t ) );
+const extraHeightJS = ( x, z, t ) => bowHeightJS( x, z ) + flareHeightJS( x, z ) + ringHeightJS( x, z, t );
 
 const TAU = Math.PI * 2;
 
@@ -257,11 +287,11 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 	}
 
 	// leviathan bow waves: height plus a finite-difference slope for the normal
-	const bh = extraHeight( p ).toVar();
+	const bh = extraHeight( p, time ).toVar();
 	const e = 0.6;
 	disp.y.addAssign( bh.mul( height ) );
-	tan.y.addAssign( extraHeight( p.add( vec2( e, 0 ) ) ).sub( bh ).div( e ).mul( height ) );
-	bin.y.addAssign( extraHeight( p.add( vec2( 0, e ) ) ).sub( bh ).div( e ).mul( height ) );
+	tan.y.addAssign( extraHeight( p.add( vec2( e, 0 ) ), time ).sub( bh ).div( e ).mul( height ) );
+	bin.y.addAssign( extraHeight( p.add( vec2( 0, e ) ), time ).sub( bh ).div( e ).mul( height ) );
 
 	return { disp, tan, bin, jacobian: tan.x.mul( bin.z ).sub( tan.z.mul( bin.x ) ) };
 
@@ -451,10 +481,10 @@ export class Etherium {
 
 		}
 		// leviathan bow waves: height plus a finite-difference slope (matches etheriumWaves)
-		const bh = extraHeightJS( x, z ), e = 0.6;
+		const bh = extraHeightJS( x, z, t ), e = 0.6;
 		dy += bh * HX;
-		ty += ( extraHeightJS( x + e, z ) - bh ) / e * HX;
-		by += ( extraHeightJS( x, z + e ) - bh ) / e * HX;
+		ty += ( extraHeightJS( x + e, z, t ) - bh ) / e * HX;
+		by += ( extraHeightJS( x, z + e, t ) - bh ) / e * HX;
 		out.dx = dx; out.dy = dy; out.dz = dz;
 		out.nx = by * tz - bz * ty; out.ny = bz * tx - bx * tz; out.nz = bx * ty - by * tx;
 		return out;

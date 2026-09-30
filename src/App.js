@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { pass } from 'three/tsl';
+import { Fn, pass, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium, bowHeightAt, flareHeightAt } from './sea/Etherium.js';
@@ -18,9 +18,11 @@ import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
 import { Dialogue } from './ui/Dialogue.js';
-import { QUARTERMASTER, TRADER, PILOT } from './game/Characters.js';
+import { QUARTERMASTER, TRADER, PILOT, STARGAZER } from './game/Characters.js';
 import { RINGS } from './game/Rings.js';
 import { Rings } from './world/Rings.js';
+import { Rim, uLens } from './world/Rim.js';
+import { RIM } from './game/Rim.js';
 import { Save } from './game/Save.js';
 import { REWARDS, trickPayout } from './game/Rewards.js';
 import { Stardust } from './world/Stardust.js';
@@ -35,7 +37,7 @@ import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
 import { UPGRADES, DEEDS, applyUpgrades, tierName } from './game/Gear.js';
-import { SPAWN, OUTPOST, FROSTWATER, REGIONS } from './world/WorldLayout.js';
+import { SPAWN, OUTPOST, FROSTWATER, HORIZON, REGIONS } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
 import { Input } from './core/Input.js';
@@ -120,8 +122,16 @@ export class App {
 		this.regions.onSunstone = ( pos ) => this.onSunstone( pos );
 		this.outposts = [
 			new Outpost( this.scene, this.sea, { at: OUTPOST, npc: TRADER } ),
-			new Outpost( this.scene, this.sea, { at: FROSTWATER, npc: PILOT, canvas: 0x2a5a7a, glow: [ 1.2, 2.6, 3.6 ], light: 0x60c0ff } )
+			new Outpost( this.scene, this.sea, { at: FROSTWATER, npc: PILOT, canvas: 0x2a5a7a, glow: [ 1.2, 2.6, 3.6 ], light: 0x60c0ff } ),
+			new Outpost( this.scene, this.sea, { at: HORIZON, npc: STARGAZER, canvas: 0x3a1a5a, glow: [ 2.6, 1.2, 3.8 ], light: 0xa060ff } )
 		];
+		this.rim = new Rim( this.scene, this.sea );
+		this.rim.onPearl = ( pos ) => {
+
+			this.spray.burst( { position: pos, velocity: this.surfer.velocity }, 14 );
+			this.toast( `Void pearl · +${ this.earn( RIM.pearl ) } ✦${ this.reachTag }` );
+
+		};
 		// the Ring Reach's ice keeps clear of the Shard Slalom's gates
 		const slalom = COURSES.find( ( c ) => c.id === 'slalom' ), rc = REGIONS.rings;
 		this.rings = new Rings( this.scene, this.sea, slalom.gates.map( ( [ a, r ] ) => ( { x: rc.x + Math.cos( a * Math.PI / 180 ) * r, z: rc.z + Math.sin( a * Math.PI / 180 ) * r } ) ) );
@@ -164,7 +174,21 @@ export class App {
 	buildPipeline() {
 
 		this.pipeline = new THREE.RenderPipeline( this.renderer );
-		const color = pass( this.scene, this.camera ).getTextureNode( 'output' );
+		const scene = pass( this.scene, this.camera ).getTextureNode( 'output' );
+		// gravitational lensing around the Rim's black hole: pixels near it sample the scene closer to
+		// its centre (so what's behind is magnified outward into an Einstein ring), and the horizon is black
+		const lens = Fn( () => {
+
+			const aspect = screenSize.x.div( screenSize.y );
+			const d = screenUV.sub( uLens.xy ).mul( vec2( aspect, 1 ) );
+			const r = length( d ).max( 1e-4 ), rs = uLens.z, on = uLens.w;
+			const warp = rs.mul( rs ).mul( RIM.hole.lens ).div( r.max( rs.mul( 0.9 ) ) );
+			return vec4( screenUV.sub( d.div( r ).mul( warp ).div( vec2( aspect, 1 ) ).mul( on ) ), r, rs );
+
+		} )();
+		const color = scene.sample( lens.xy );
+		// the event horizon stays black: masked after bloom so no glow bleeds across it
+		const horizon = mix( float( 1 ), smoothstep( lens.w.mul( 0.97 ), lens.w.mul( 1.03 ), lens.z ), uLens.w );
 		this.flare = new SunFlare( this.sea.uSunDir );
 		let out = color.add( this.flare.node );
 		if ( ! this.params.has( 'noBloom' ) ) {
@@ -173,7 +197,7 @@ export class App {
 			out = out.add( this.bloom );
 
 		}
-		this.pipeline.outputNode = out;
+		this.pipeline.outputNode = vec4( out.rgb.mul( horizon ), 1 );
 
 	}
 
@@ -262,6 +286,10 @@ export class App {
 			this.leviathans.collide( this.surfer );
 			this.galleon.collide( this.surfer );
 			for ( const o of this.outposts ) o.collide( this.surfer );
+			// the Rim: a swirling current carries you round, and the air is light
+			const sp = this.surfer.position;
+			this.surfer.velocity.addScaledVector( this.rim.current( sp.x, sp.z, this._current || ( this._current = new THREE.Vector3() ) ), dt );
+			this.surfer.gravityScale = this.rim.gravityAt( sp.x, sp.z );
 			this.rideBowWave( dt );
 			this.rideFlare( dt );
 
@@ -279,6 +307,7 @@ export class App {
 		const helm = this.mode === 'helm' && ! this.dialogue.active;
 		for ( const o of this.outposts ) o.update( dt );
 		this.rings.update( dt, this.onFoot ? null : this.surfer );
+		this.rim.update( dt, this.camera, this.onFoot ? null : this.surfer );
 		this.galleon.update( dt, helm ? { steer: key( 'KeyD' ) - key( 'KeyA' ), sail: key( 'KeyW' ) - key( 'KeyS' ) } : null );
 		if ( this.mode === 'helm' && this.time > ( this.poseSavedAt || 0 ) + 5 ) this.saveShipPose();
 		if ( this.onFoot ) this.walker.sync(); // the deck may have moved under you
@@ -422,7 +451,7 @@ export class App {
 	// Characters with something to offer build their conversation here; others just chat.
 	talkTo( npc ) {
 
-		if ( npc.id === 'shipwright' || npc.id === 'trader' || npc.id === 'pilot' ) return this.openShop( npc );
+		if ( [ 'shipwright', 'trader', 'pilot', 'stargazer' ].includes( npc.id ) ) return this.openShop( npc );
 		if ( npc.id === 'marshal' ) return this.openRaces( npc );
 		if ( npc.id !== 'dockmaster' ) return this.dialogue.open( npc.name, npc.lines );
 		const c = this.courier;

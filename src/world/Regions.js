@@ -3,6 +3,7 @@ import { uv, vec3, float, smoothstep, length, positionWorld, cameraPosition, mx_
 import { REGIONS } from './WorldLayout.js';
 import { FLARES, FLARE_TINT, REACH } from '../game/Flares.js';
 import { RINGS } from '../game/Rings.js';
+import { RIM } from '../game/Rim.js';
 import { setFlareRegion, setFlare, FRONTS } from '../sea/Etherium.js';
 import { uSunBoost } from '../sky/Starfield.js';
 
@@ -39,7 +40,8 @@ export class Regions {
 		// every region's atmosphere and pay
 		this.list = [
 			{ ...REGIONS.flare, tint: FLARE_TINT, multiplier: REACH.multiplier, inside: false, mix: 0 },
-			{ ...REGIONS.rings, tint: RINGS.tint, multiplier: RINGS.multiplier, inside: false, mix: 0 }
+			{ ...REGIONS.rings, tint: RINGS.tint, multiplier: RINGS.multiplier, inside: false, mix: 0 },
+			{ ...REGIONS.rim, tint: RIM.tint, multiplier: RIM.multiplier, inside: false, mix: 0 }
 		];
 		this.flareRegion = this.list[ 0 ];
 		this.active = null; // the region you're inside

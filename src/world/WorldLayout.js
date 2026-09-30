@@ -25,7 +25,9 @@ export const REGIONS = {
 	// swell: the Reach's swell height multiplier (blends in toward the edge)
 	flare: { name: 'the Flare Reach', x: - 2480, z: - 3120, radius: 1400, dir: [ 0.62, 0.78 ], swell: 1.8 },
 	// toward the gas giant (its horizontal direction from the harbour, ~4.2 km out)
-	rings: { name: 'the Ring Reach', x: 3385, z: - 2482, radius: 1300 }
+	rings: { name: 'the Ring Reach', x: 3385, z: - 2482, radius: 1300 },
+	// south of the harbour, under the black hole (a beam reach both ways)
+	rim: { name: 'the Rim', x: 400, z: 4600, radius: 1400 }
 };
 
 // The Ember Outpost: a floating trading raft at the heart of the Flare Reach
@@ -33,6 +35,9 @@ export const OUTPOST = { x: - 2480, z: - 3120 };
 
 // Frostwater Station: beside the ice spire at the heart of the Ring Reach
 export const FROSTWATER = { x: 3385 + 110, z: - 2482 + 20 };
+
+// Horizon Station: at the Rim's calm-ish centre, where the ring waves fade
+export const HORIZON = { x: 400 + 60, z: 4600 - 40 };
 
 // The leviathans' migration loop: an ellipse around the harbour, swum anticlockwise seen from above.
 export const MIGRATION = {

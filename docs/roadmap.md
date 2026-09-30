@@ -3,7 +3,7 @@
 **Read this first each session.** Update the status and "Next up" sections at the end of every session.
 
 ## Status
-- **Current milestone:** 8, regions and polish (slices 1-2 done: the Flare Reach, the Ring Reach). Milestone 7 done.
+- **Current milestone:** 8, regions and polish (slices 1-3 done: the Flare Reach, the Ring Reach, the Rim). Milestone 7 done.
   deferred to polish).
 - **Design note from the user:** gameplay numbers (board speed, wind strength, etc.) stay as tunable
   variables; later, upgrades bought with credits will modify them (e.g. a faster board). Don't bake in
@@ -197,6 +197,17 @@
   Slalom**, an 11-gate course weaving round the spire; courses can have a region `center`; the harbour
   marshal lists only harbour courses; `App.raceChoice`). Slalom medals from an autopilot (~117 s):
   gold 108, silver 130.
+- **Milestone 8 slice 3 (2026-09-30): the Rim.** `REGIONS.rim` (4.6 km south, radius 1400; tuning in
+  `src/game/Rim.js`). **Infalling ring waves** (concentric sin swells moving inward at 13 m/s, 5 m, fading
+  at the core and edge) in both wave functions (`extraHeight( p, t )` now takes time). `src/world/Rim.js`:
+  the black hole 1100 m up and 900 m south of the centre (black horizon, fresnel photon ring, additive
+  accretion disk with orbit-speed streaks and Doppler-ish beaming, all fog-free), `uLens` (screen
+  position and horizon radius) feeding a **lensing post pass** in `App.buildPipeline` (samples the scene
+  toward the hole, ~rs²/r; the horizon mask is applied after bloom so no glow bleeds over it); a
+  **swirling current** (`Rim.current`, up to 3.5 m/s²) and **low air gravity** (`Surfer.gravityScale`,
+  0.65 inside); 45 **void pearls** 7-13 m above the swell (+15, respawn 120 s); x2 pay; **Horizon Station**
+  (`HORIZON`, the **Stargazer** `STARGAZER`: the shop). Measured: jumps 6.2 s of air at 0.55 gravity
+  (too floaty), now 0.65.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -260,9 +271,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Get the user's play-test of the Ring Reach (shard density, close shaves, crystals, the slalom). Then the
-black hole rim (lensing post-pass, time-slow?), then a title screen, performance work and a GitHub Pages
-deploy.
+Get the user's play-test of the Rim (ring waves, swirl, floatiness, pearls, the black hole's look). Then
+milestone 8's remaining polish: a title screen, performance work (LOD / dynamic resolution), and a GitHub
+Pages deploy. Maybe a map or compass showing the regions.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
