@@ -20,7 +20,7 @@ export class Walker {
 		this.yaw = 0; // facing on the platform: ( sin yaw, 0, cos yaw ) in platform coordinates
 		this.phase = 0;
 		this.moving = 0;
-		this.figure = buildFigure( { coat: 0x2c4a6b } );
+		this.figure = buildFigure( { coat: 0x2c4a6b, goggles: true } ); // the player: same look as the rider
 		this.figure.visible = false;
 		scene.add( this.figure );
 
