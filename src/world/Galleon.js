@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, positionWorld, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
+import { Fn, uniform, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, time, positionWorld, positionLocal, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
 import { GALLEON, HARBOR } from './WorldLayout.js';
 import { RING_OUT } from './Port.js';
 import { sailPower } from './Wind.js';
@@ -33,6 +33,7 @@ const HALF = SHIP.length / 2, W = SHIP.beam / 2;
 const DECK = 0.4; // deck surface height in ship coordinates
 const CASTLE_FRONT = - HALF + 9; // the stern castle spans from here back to the stern
 const MASTS = [ 6, - 3 ]; // mast positions along the ship (z)
+const RIG = [ [ MASTS[ 0 ], 20, 10, 8 ], [ MASTS[ 1 ], 24, 12, 10 ] ]; // per mast: z, height, sail width, sail height
 const HELM_Z = CASTLE_FRONT + 1.5; // the wheel
 export const HELM_SPOT = { x: 0, z: CASTLE_FRONT + 0.7 }; // where the helmsman stands (ship coordinates)
 const smooth = ( a, b, x ) => {
@@ -229,7 +230,11 @@ export class Galleon {
 
 			const grain = mx_fractal_noise_float( positionWorld.mul( vec3( 0.4, 3.0, 0.4 ) ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
 			const planks = smoothstep( 0.0, 0.08, abs( fract( uv().y.mul( 9.0 ) ).sub( 0.5 ) ) );
-			const base = mix( vec3( 0.13, 0.05, 0.03 ), vec3( 0.3, 0.12, 0.06 ), grain ).mul( planks.mul( 0.35 ).add( 0.65 ) );
+			const base = mix( vec3( 0.13, 0.05, 0.03 ), vec3( 0.3, 0.12, 0.06 ), grain ).mul( planks.mul( 0.35 ).add( 0.65 ) ).toVar();
+			// copper sheathing gone to verdigris below the waterline, a brass wale stripe, the gold rail band
+			const copper = mix( vec3( 0.05, 0.22, 0.2 ), vec3( 0.32, 0.16, 0.07 ), grain.mul( grain ) ).mul( planks.mul( 0.2 ).add( 0.8 ) );
+			base.assign( mix( copper, base, smoothstep( 0.3, 0.34, uv().y ) ) );
+			base.assign( mix( base, vec3( 0.7, 0.46, 0.18 ), smoothstep( 0.0, 0.01, uv().y.sub( 0.62 ).abs().oneMinus().sub( 0.985 ) ) ) );
 			return mix( base, vec3( 0.75, 0.5, 0.2 ), smoothstep( 0.93, 0.96, uv().y ) );
 
 		} )();
@@ -305,7 +310,7 @@ export class Galleon {
 		g.add( sprit );
 
 		// masts and solar sails
-		for ( const [ z, h, sw, sh ] of [ [ MASTS[ 0 ], 20, 10, 8 ], [ MASTS[ 1 ], 24, 12, 10 ] ] ) {
+		for ( const [ z, h, sw, sh ] of RIG ) {
 
 			const mast = new THREE.Mesh( new THREE.CylinderGeometry( 0.22, 0.32, h, 10 ), wood );
 			mast.position.set( 0, h / 2, z );
@@ -371,6 +376,126 @@ export class Galleon {
 		const light = new THREE.PointLight( 0xffb060, 80, 40, 1.6 );
 		light.position.set( 0, 6, 0 );
 		g.add( light );
+
+		this.dress( { brass, glow, windowGlow, sail } );
+
+	}
+
+	// Hero details (graphics pass 2): topsails, rigging, cap rails, portholes, figurehead, stern gallery,
+	// a cornice on the castle and a long pennant. All decoration: no collision changes.
+	dress( { brass, glow, windowGlow, sail } ) {
+
+		const g = this.group;
+		const railY = ( t ) => sheer( t ) + 1.3;
+		const tOf = ( z ) => ( HALF - z ) / SHIP.length;
+
+		// topsails above the main sails (they reef with them)
+		for ( const [ z, h, sw, sh ] of RIG ) {
+
+			const tw = sw * 0.72, th = sh * 0.55, y = h - 0.8;
+			const s = new THREE.Mesh( sailGeometry( tw, th, 0.8 ).translate( 0, - th / 2, 0 ), sail );
+			s.position.set( 0, y, z + 0.35 );
+			const yard = new THREE.Mesh( new THREE.CylinderGeometry( 0.08, 0.08, tw + 0.8, 8 ).rotateZ( Math.PI / 2 ), brass );
+			yard.position.set( 0, y, z + 0.28 );
+			g.add( s, yard );
+			this.sailMeshes.push( s );
+
+		}
+
+		// rigging: shrouds from each masthead down to the rails, stays fore and aft
+		const rope = [];
+		const seg = ( a, b ) => rope.push( ...a, ...b );
+		for ( const [ z, h ] of RIG ) {
+
+			for ( const side of [ 1, - 1 ] ) for ( const dz of [ - 2.5, - 0.8, 0.9 ] ) {
+
+				const t = tOf( z + dz );
+				seg( [ 0, h - 1.5, z ], [ side * halfWidth( t ) * 0.97, railY( t ), z + dz ] );
+
+			}
+
+		}
+		const [ fore, main ] = RIG;
+		seg( [ 0, fore[ 1 ] - 1, fore[ 0 ] ], [ 0, 2.8 + 4.5 * Math.sin( 0.35 ), HALF + 2.5 + 4.5 * Math.cos( 0.35 ) ] ); // forestay to the bowsprit tip
+		seg( [ 0, main[ 1 ] - 1, main[ 0 ] ], [ 0, fore[ 1 ] - 1, fore[ 0 ] ] ); // mainstay
+		seg( [ 0, main[ 1 ] - 1, main[ 0 ] ], [ 0, 3.4, - HALF + 1 ] ); // backstay to the castle
+		const ropeGeo = new THREE.BufferGeometry();
+		ropeGeo.setAttribute( 'position', new THREE.Float32BufferAttribute( rope, 3 ) );
+		g.add( new THREE.LineSegments( ropeGeo, new THREE.LineBasicNodeMaterial( { color: 0x1a120c } ) ) );
+
+		// brass cap rails along both sides
+		for ( const side of [ 1, - 1 ] ) {
+
+			const pts = [];
+			for ( let i = 1; i < 40; i ++ ) {
+
+				const t = 0.02 + i / 40 * 0.96;
+				pts.push( new THREE.Vector3( side * halfWidth( t ), railY( t ) + 0.05, HALF - t * SHIP.length ) );
+
+			}
+			g.add( new THREE.Mesh( new THREE.TubeGeometry( new THREE.CatmullRomCurve3( pts ), 120, 0.07, 6 ), brass ) );
+
+		}
+
+		// portholes: brass rings with warm glass along both sides
+		const ring = new THREE.TorusGeometry( 0.32, 0.06, 6, 16 ).rotateY( Math.PI / 2 );
+		const pane = new THREE.CircleGeometry( 0.28, 14 ).rotateY( Math.PI / 2 );
+		for ( let z = HALF - 9; z > CASTLE_FRONT + 1; z -= 2.6 ) {
+
+			const t = tOf( z ), w = halfWidth( t ) * 0.94, y = railY( t ) - 1.3 - keel( t ) * 0.1;
+			for ( const side of [ 1, - 1 ] ) {
+
+				const r = new THREE.Mesh( ring, brass );
+				r.position.set( side * ( w + 0.03 ), y, z );
+				const p = new THREE.Mesh( pane, windowGlow );
+				p.position.set( side * ( w + 0.05 ), y, z );
+				p.rotation.y = side > 0 ? 0 : Math.PI;
+				g.add( r, p );
+
+			}
+
+		}
+
+		// figurehead: a brass star with a glowing heart, riding the stem
+		const star = new THREE.Group();
+		star.position.set( 0, railY( 0 ) + 0.1, HALF + 0.4 );
+		const points = new THREE.Mesh( new THREE.OctahedronGeometry( 0.9 ).scale( 1, 1, 0.35 ), brass );
+		const points2 = points.clone();
+		points2.rotation.z = Math.PI / 4;
+		points2.scale.setScalar( 0.75 );
+		const heart = new THREE.Mesh( new THREE.SphereGeometry( 0.28, 12, 8 ), glow );
+		heart.position.z = 0.05;
+		star.add( points, points2, heart );
+		g.add( star );
+
+		// stern gallery (a balcony under the windows) and a cornice round the castle roof
+		const rail = new THREE.Mesh( new THREE.CylinderGeometry( 0.06, 0.06, 7.4, 8 ).rotateZ( Math.PI / 2 ), brass );
+		rail.position.set( 0, 2.4, - HALF + 0.15 );
+		const floor = new THREE.Mesh( new THREE.BoxGeometry( 7.4, 0.12, 0.9 ), brass );
+		floor.position.set( 0, 1.55, - HALF + 0.55 );
+		g.add( rail, floor );
+		for ( let i = 0; i <= 8; i ++ ) {
+
+			const post = new THREE.Mesh( new THREE.CylinderGeometry( 0.04, 0.04, 0.8, 6 ), brass );
+			post.position.set( - 3.6 + i * 0.9, 2.0, - HALF + 0.15 );
+			g.add( post );
+
+		}
+		const cornice = new THREE.Mesh( new THREE.BoxGeometry( 7.7, 0.22, 8.5 ), brass );
+		cornice.position.set( 0, 3.25, - HALF + 5 );
+		g.add( cornice );
+
+		// a long pennant streaming from the mainmast head
+		const penGeo = new THREE.PlaneGeometry( 9, 1, 24, 1 ).translate( 4.5, 0, 0 );
+		const pp = penGeo.attributes.position;
+		for ( let i = 0; i < pp.count; i ++ ) pp.setY( i, pp.getY( i ) * ( 1 - pp.getX( i ) / 9.5 ) ); // taper
+		penGeo.rotateY( Math.PI / 2 ); // streams aft (-z)
+		const penMat = new THREE.MeshStandardNodeMaterial( { color: 0xc23048, emissive: 0x400a14, roughness: 0.8, side: THREE.DoubleSide } );
+		const along = positionLocal.z.negate().div( 9 );
+		penMat.positionNode = positionLocal.add( vec3( sin( time.mul( 5 ).add( along.mul( 8 ) ) ).mul( along ).mul( 0.6 ), sin( time.mul( 3.3 ).add( along.mul( 5 ) ) ).mul( along ).mul( 0.3 ), 0 ) );
+		const pennant = new THREE.Mesh( penGeo, penMat );
+		pennant.position.set( 0, main[ 1 ] + 0.2, main[ 0 ] );
+		g.add( pennant );
 
 	}
 

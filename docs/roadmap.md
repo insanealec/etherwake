@@ -264,6 +264,13 @@
   legs (knees bend with crouch) and arms (hands on the wishbone grips), sideways stance on the windward
   side that turns round when the sail crosses sides, goggles, hair, belt; a scarf streaming from the neck.
   Test camera trick: fly mode plus a rAF loop that pins the surfer and places the camera round it.
+- **Graphics pass 2, slice 3: figures and galleon (2026-10-02).** `player/Figure.js` rebuilt in the rider's
+  style (tapered coat with skirts, belt, buckle, collar, hair, hats with brass bands, goggles for the
+  player; hip/knee/shoulder pivots, knees bend in the walk cycle). `Galleon.dress()`: topsails (in
+  `sailMeshes`, so they reef), rope rigging (LineSegments shrouds and stays), brass cap rails, glowing
+  portholes, verdigris copper sheathing and a brass wale stripe in the hull shader, a brass star
+  figurehead, a stern balcony, a castle cornice and a fluttering mainmast pennant. Decoration only:
+  collisions (`solid`) unchanged.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -328,8 +335,7 @@
 
 ## Next up
 Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky, the
-surfer hero model. Next candidates, biggest impact first: the galleon and the NPC/walker figures (reuse
-the rider's parts from `SurferModel.js`); bloom and exposure
+surfer hero model, figures, galleon dressing. Next candidates, biggest impact first: bloom and exposure
 tuning per region; motion feel (speed streaks, camera shake on landings). Hosting later (Cloudflare
 Pages), and a title screen.
 
