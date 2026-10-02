@@ -272,7 +272,7 @@
   figurehead, a stern balcony, a castle cornice and a fluttering mainmast pennant. Decoration only:
   collisions (`solid`) unchanged.
 - **Motion feel (2026-10-02).** `MOTION` in `core/ChaseCamera.js`: landings add camera trauma
-  (impact x 0.07, decays ~1/s) shown as roll and pitch shake (trauma squared); a faint rumble at speed.
+  (impact x 0.055, decays ~1/s; toned down once at the user's request) shown as roll and pitch shake (trauma squared); a faint rumble at speed.
   Speed 12..34 m/s maps to `app.speedFx` 0..1: up to +9 degrees of field of view and speed lines
   (`speedLines()` in `post/Cinematic.js`, `SPEED_LINES`: thin dashes streaming out at the screen edges).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned

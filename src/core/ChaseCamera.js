@@ -14,7 +14,7 @@ const DEFAULTS = {
 // motion feel: camera shake from landings (trauma, decays) and a faint rumble at speed; the wider
 // field of view and speed lines that also come with speed are applied in App (see MOTION.speed)
 export const MOTION = {
-	shake: { perImpact: 0.07, max: 1, decay: 1.1, roll: 0.05, pitch: 0.04 }, // trauma per unit impact, cap, decay /s; max angles (rad)
+	shake: { perImpact: 0.055, max: 1, decay: 1.1, roll: 0.04, pitch: 0.03 }, // trauma per unit impact, cap, decay /s; max angles (rad)
 	rumble: 0.18, // shake level at full speed
 	speed: { from: 12, to: 34, fov: 9, lines: 1 } // m/s range mapped to 0..1; extra fov (deg); line strength
 };
