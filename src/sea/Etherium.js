@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import {
 	Fn, uniform, float, vec2, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, select,
 	positionGeometry, attribute, round, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
-	mx_fractal_noise_float, mx_noise_float, mx_noise_vec3, Loop
+	mx_fractal_noise_float, mx_noise_float
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
 import { HARBOR, REGIONS } from '../world/WorldLayout.js';
@@ -231,6 +231,10 @@ export const PALETTE = {
 	crestA: new THREE.Color( 1.00, 0.32, 0.03 ), // gold
 	crestB: new THREE.Color( 1.00, 0.10, 0.16 ), // rose
 	foam: new THREE.Color( 1.00, 0.70, 0.42 ),
+	cloudLitA: new THREE.Color( 0.30, 0.15, 0.50 ), // sunlit billows: lavender
+	cloudLitB: new THREE.Color( 0.48, 0.14, 0.30 ), // and dusky rose
+	cloudShadeA: new THREE.Color( 0.01, 0.04, 0.09 ), // creases: deep teal
+	cloudShadeB: new THREE.Color( 0.04, 0.008, 0.10 ), // and violet
 	rim: new THREE.Color( 0.30, 0.10, 0.55 ),
 	sun: new THREE.Color( 1.00, 0.60, 0.30 ),
 	underside: new THREE.Color( 0.08, 0.015, 0.16 ),
@@ -240,9 +244,49 @@ export const PALETTE = {
 
 export const FOG = { above: 0.0011, below: 0.03 };
 
-// The sea's gas volume look (see the colour shader): how far into the gas each pixel looks, in how many
-// steps, how strongly the gas glows and how quickly it hides what's behind it
-export const GAS = { depth: 9, steps: 8, glow: 0.8, absorb: 1.1 };
+// Cloud tops: the swell is covered in rounded billows (billow noise, two sizes),
+// lit by the sun like cumulus: bright sun-facing tops, violet shade in the creases. Visual only (physics
+// rides the smooth swell, so the board sinks a little into the billows). See billow() and cloudColor().
+export const CLOUD = {
+	big: { cell: 9, amp: 1.8 }, // metres: billow size and height (also lifts the mesh near the camera)
+	fine: { cell: 3, amp: 0.5 }, // per-pixel lumps on the billows
+	drift: [ 0.9, 0.25 ], // m/s
+	wrap: 0.2, // diffuse wrap: how far light creeps round the billows
+	glow: 0.5 // how much the crest colours glow from within
+};
+// billow noise: |noise| has rounded tops and creased valleys, like the lumps on a cumulus
+const lumps = ( q, t, seed ) => mx_noise_float( vec3( q, t.mul( 0.04 ).add( seed ) ) ).abs().mul( 1.6 ).clamp();
+
+// TSL: billow height (metres) and crease occlusion at xz. fine: 0..1 weight of the small octave.
+export function billow( xz, t, fine ) {
+
+	const q = xz.sub( vec2( ...CLOUD.drift ).mul( t ) );
+	const d1 = lumps( q.div( CLOUD.big.cell ), t, 0 );
+	const d2 = lumps( q.div( CLOUD.fine.cell ), t, 5.3 );
+	return {
+		h: d1.mul( CLOUD.big.amp ).add( d2.mul( CLOUD.fine.amp ).mul( fine ) ),
+		occ: mix( float( 0.3 ), float( 1 ), d1.sqrt().mul( mix( float( 1 ), d2.sqrt().mul( 0.4 ).add( 0.6 ), fine ) ) )
+	};
+
+}
+
+// TSL: cumulus-style shading in the nebula palette (shared by the sea and the cloud puffs).
+// N, L, V: normal, sun and view directions; crest, tint: 0..1; occ: crease darkening; c: palette lookup
+export function cloudColor( N, L, V, crest, tint, occ, c ) {
+
+	const diffuse = dot( N, L ).add( CLOUD.wrap ).div( 1 + CLOUD.wrap ).clamp();
+	const sky = N.y.mul( 0.5 ).add( 0.5 ); // light from the glowing sky above
+	const shade = mix( c( 'cloudShadeA' ), c( 'cloudShadeB' ), tint );
+	const lit = mix( c( 'cloudLitA' ), c( 'cloudLitB' ), tint );
+	const hot = mix( c( 'crestA' ), c( 'crestB' ), tint.oneMinus() );
+	const col = mix( shade, lit, diffuse.mul( 0.8 ).add( sky.mul( 0.2 ) ) ).mul( occ ).toVar();
+	col.addAssign( hot.mul( crest.mul( crest ) ).mul( CLOUD.glow ).mul( diffuse.mul( 0.6 ).add( 0.4 ) ) );
+	// silver lining: thin edges glow when the sun is behind them
+	const edge = pow( max( dot( N, V ), 0 ).oneMinus(), 3 );
+	col.addAssign( c( 'sun' ).mul( pow( max( dot( V.negate(), L ), 0 ), 4 ) ).mul( edge ).mul( 1.2 ) );
+	return col;
+
+}
 
 // Precomputed per-wave constants from the WAVES table (shared by JS and TSL).
 function waveConstants() {
@@ -397,11 +441,15 @@ export class Etherium {
 			const p = round( positionGeometry.xz.add( this.uOffset ).div( step ) ).mul( step ).toVar();
 			const w = etheriumWaves( p, this.uWaves, this.uTime, this.uHeight, cameraPosition.xz );
 
+			// the big billows lift the mesh near the camera (further out they're only shading)
+			const xz = p.add( w.disp.xz );
+			const near = smoothstep( 220.0, 90.0, length( xz.sub( cameraPosition.xz ) ) );
+			const lift = billow( xz, this.uTime, float( 0 ) ).h.mul( near );
 			vNormal.assign( normalize( cross( w.bin, w.tan ) ) );
-			vWorld.assign( vec3( p.x.add( w.disp.x ), w.disp.y, p.y.add( w.disp.z ) ) );
+			vWorld.assign( vec3( xz.x, w.disp.y.add( lift ), xz.y ) );
 			vCrest.assign( w.disp.y.div( this.uMaxAmp ) );
 			vJacobian.assign( w.jacobian );
-			return vec3( p.x.sub( this.uOffset.x ), 0, p.y.sub( this.uOffset.y ) ).add( w.disp );
+			return vec3( p.x.sub( this.uOffset.x ), lift, p.y.sub( this.uOffset.y ) ).add( w.disp );
 
 		} )();
 
@@ -415,48 +463,27 @@ export class Etherium {
 			const t = this.uTime;
 			const P = vWorld;
 			const n = normalize( vNormal );
-			const N = select( frontFacing, n, n.negate() );
 			const V = normalize( cameraPosition.sub( P ) );
 			const L = this.uSunDir;
+			const dist = length( cameraPosition.sub( P ) );
 
-			// The gas: from this point, step a short way down into the etherium along the view ray (bent
-			// downward, so grazing views still sink in) and gather glowing density from swirling 3D noise.
-			// Layers at different depths parallax past each other: it reads as looking into gas, not at a skin.
-			const tint = mx_noise_float( vec3( P.xz.mul( 0.005 ), t.mul( 0.02 ) ) ).mul( 0.5 ).add( 0.5 ).clamp();
+			// cloud tops: per-pixel billow bumps on top of the swell (finite-difference slope of both octaves)
+			const fine = smoothstep( 160.0, 40.0, dist ); // the small lumps fade out with distance
+			const e = 0.3;
+			const b0 = billow( P.xz, t, fine );
+			const bx = billow( P.xz.add( vec2( e, 0 ) ), t, fine ).h;
+			const bz = billow( P.xz.add( vec2( 0, e ) ), t, fine ).h;
+			const bump = smoothstep( 300.0, 40.0, dist ).mul( 2.0 );
+			const nb = normalize( n.add( vec3( bx.sub( b0.h ).div( e ).negate(), 0, bz.sub( b0.h ).div( e ).negate() ).mul( bump ) ) );
+			const N = select( frontFacing, nb, nb.negate() );
+
 			const crest = smoothstep( - 0.3, 0.75, vCrest );
-			const trough = mix( c( 'troughA' ), c( 'troughB' ), tint );
+			const tint = mx_noise_float( vec3( P.xz.mul( 0.005 ), t.mul( 0.02 ) ) ).mul( 0.5 ).add( 0.5 ).clamp();
+			const col = cloudColor( N, L, V, crest, tint, b0.occ, c ).toVar();
+
+			// glowing puffs where crests pinch (low Jacobian)
 			const hot = mix( c( 'crestA' ), c( 'crestB' ), tint.oneMinus() );
-			const top = mix( trough, hot, crest.mul( crest ) ); // the colour near the surface
-			const deep = mix( c( 'troughB' ), c( 'troughA' ), tint ).mul( 0.7 ); // and deeper in
-
-			const Vd = V.negate();
-			const ray = normalize( vec3( Vd.x, Vd.y.min( - 0.3 ), Vd.z ) );
-			const flow = vec3( 1.6, 0, 0.4 ).mul( t );
-			const warp = mx_noise_vec3( vec3( P.xz.mul( 0.008 ), t.mul( 0.02 ) ) ).mul( 14 ); // big slow swirls
-			const emit = vec3( 0 ).toVar();
-			const trans = float( 1 ).toVar();
-			const dens = float( 0 ).toVar(); // density nearest the surface (for the glow effects below)
-			const STEPS = GAS.steps, SPACING = GAS.depth / STEPS;
-			Loop( STEPS, ( { i } ) => {
-
-				const d = float( i ).add( 0.5 ).mul( SPACING );
-				const q = P.add( ray.mul( d ) ).sub( flow ).add( warp );
-				const n = mx_fractal_noise_float( q.mul( vec3( 0.035, 0.07, 0.035 ) ).add( vec3( 0, t.mul( 0.06 ), 0 ) ), 3, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 );
-				const k = d.div( GAS.depth );
-				const rho = smoothstep( 0.38, 0.8, n ).mul( k.mul( 0.9 ).add( 0.35 ) ); // patchy on top, fuller deeper
-				dens.assign( select( i.equal( 0 ), rho, dens ) );
-				emit.addAssign( mix( top, deep, k ).mul( rho ).mul( trans ).mul( GAS.glow ) );
-				trans.mulAssign( rho.mul( - GAS.absorb ).exp() );
-
-			} );
-			const col = emit.mul( mix( float( 0.6 ), float( 1.35 ), crest ) ).add( deep.mul( 0.12 ).mul( trans ) ).toVar();
-
-			// soft sun-facing shading keeps the swell shapes readable (gentle, gas has no hard highlight)
-			col.mulAssign( mix( float( 0.75 ), float( 1.15 ), dot( N, L ).mul( 0.5 ).add( 0.5 ) ) );
-
-			// glowing puffs where crests pinch (low Jacobian), instead of white foam
-			const puff = smoothstep( 0.65, 0.3, vJacobian ).mul( dens );
-			col.addAssign( hot.mul( puff ).mul( 0.7 ) );
+			col.addAssign( hot.mul( smoothstep( 0.65, 0.3, vJacobian ) ).mul( 0.35 ) );
 
 			// regions tint the sea (the Flare Reach runs hotter, the Ring Reach frostier);
 			// a flare-front's face glows like molten gold
@@ -464,16 +491,11 @@ export class Etherium {
 			col.assign( mix( col, recolor, this.uFlareMix ) );
 			col.addAssign( vec3( ...FLARE_TINT.glow ).mul( pow( flareHeight( P.xz ).div( FLARES.height ), 2 ) ).mul( 0.55 ) );
 
-			// back-lit gas: looking toward the sun, thin gas glows (a silver lining instead of a glint)
-			const back = pow( max( dot( V.negate(), L ), 0 ), 6 ).mul( dens );
-			col.addAssign( c( 'sun' ).mul( back ).mul( 0.9 ) );
-
-			// grazing angles look through more gas: thicken toward the fog colour
-			const thick = pow( max( dot( N, V ), 0 ).oneMinus(), 6 );
-			col.assign( mix( col, this.uFogColor.mul( 2.2 ).add( c( 'rim' ).mul( 0.15 ) ), thick.mul( 0.3 ) ) );
+			// distant cloud tops soften into the haze
+			col.assign( mix( col, this.uFogColor.mul( 2.2 ).add( c( 'rim' ).mul( 0.15 ) ), smoothstep( 150.0, 900.0, dist ).mul( 0.35 ) ) );
 
 			// underside: a dim violet glow seen through the fog
-			const under = c( 'underside' ).mul( dens.mul( 0.8 ).add( 0.3 ) ).add( c( 'crestB' ).mul( crest.mul( 0.25 ) ) );
+			const under = c( 'underside' ).mul( b0.occ.mul( 0.8 ).add( 0.3 ) ).add( c( 'crestB' ).mul( crest.mul( 0.25 ) ) );
 			return select( frontFacing, col, under );
 
 		} )();

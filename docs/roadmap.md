@@ -234,6 +234,15 @@
   stays. Gas shells are thicker and taller (0.7 / 1.6 / 2.7 / 4.0 m, strength 0.3) so crests fray into
   mist; motes are dimmer and the near layer sparser (accents, not the main event). Swell shapes and
   physics unchanged.
+- **Cloud sea (2026-10-02),** user: the gas sea still read as "water covered by haze"; wanted "surfing
+  through/on a cloud". The volume march is gone. The sea is now lit as cumulus cloud tops: billow-noise
+  lumps (two sizes, `CLOUD` + `billow()` in `Etherium.js`) lift the mesh near the camera and bump the
+  normals, shaded by `cloudColor()` (sun-wrapped diffuse, sky light, violet creases, glowing crest colours,
+  silver lining); new palette entries `cloudLit*` / `cloudShade*`. New `sea/Puffs.js`: 64x64 instanced
+  sprite billows heaped on the crests, shaded with the same `cloudColor` as lumpy spheres, soft depth fade
+  into the sea, parted by the board, thinned with distance (they form the cloud bank on the horizon).
+  The haze shells are off by default (`?shells` brings them back; `?noPuffs` hides the puffs). Billows
+  are visual only: the board rides the smooth swell and sinks a little into the lumps.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

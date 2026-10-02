@@ -9,6 +9,7 @@ import { SunFlare } from './post/SunFlare.js';
 import { godRays, grade } from './post/Cinematic.js';
 import { Motes, MOTE_LAYERS } from './sea/Motes.js';
 import { Shells } from './sea/Shells.js';
+import { Puffs } from './sea/Puffs.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera } from './core/ChaseCamera.js';
@@ -100,7 +101,8 @@ export class App {
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
 		this.giant = new GasGiant( this.scene, this.sea.uSunDir );
 		this.moon = new Moon( this.scene, this.sea.uSunDir );
-		if ( ! this.params.has( 'noShells' ) ) this.shells = new Shells( this.scene, this.sea );
+		if ( ! this.params.has( 'noPuffs' ) ) this.puffs = new Puffs( this.scene, this.sea );
+		if ( this.params.has( 'shells' ) ) this.shells = new Shells( this.scene, this.sea );
 		this.motes = this.params.has( 'noMotes' ) ? [] : Object.values( MOTE_LAYERS ).map( ( layer ) => new Motes( this.scene, this.sea, layer ) );
 		this.tweaks = new TweakPanel( this );
 		this.buildPipeline();
@@ -360,6 +362,7 @@ export class App {
 		this.flare.update( this.camera );
 		for ( const m of this.motes ) m.update( this.camera, this.surfer );
 		if ( this.shells ) this.shells.update();
+		if ( this.puffs ) this.puffs.update( this.camera, this.surfer );
 		this.updateHud();
 		this.updateObjective();
 		if ( input.wasPressed( 'Tab' ) ) this.seaMap.toggle();
