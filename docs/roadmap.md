@@ -256,6 +256,14 @@
   glows just above the tops; the low parts fade into the horizon colour (aerial perspective); the sun dims
   behind them. Also: `WhaleSong` no longer throws every frame if audio started before it was built (seen
   after a hot reload).
+- **Graphics pass 2, slice 2: the surfer (2026-10-02).** New `player/SurferModel.js` (Surfer.buildModel
+  delegates to it; `rimMat`, `sail`, `rider` kept). Board: extruded hull with bevelled rails, nose/tail
+  rocker, wood-grain deck over a dark hull, brass rail tube (still the landing cue), gold inlay, twin tail
+  thrusters whose nozzles glow with the throttle. Sail: cambered grid with a roach, seams, glowing gold
+  battens, fluttering leech (TSL vertex), a little glow when backlit; wishbone boom. Rider: two-bone IK
+  legs (knees bend with crouch) and arms (hands on the wishbone grips), sideways stance on the windward
+  side that turns round when the sail crosses sides, goggles, hair, belt; a scarf streaming from the neck.
+  Test camera trick: fly mode plus a rAF loop that pins the surfer and places the camera round it.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -319,8 +327,9 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky. Next
-candidates, biggest impact first: better hero models (board, rider, sail; the galleon); bloom and exposure
+Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky, the
+surfer hero model. Next candidates, biggest impact first: the galleon and the NPC/walker figures (reuse
+the rider's parts from `SurferModel.js`); bloom and exposure
 tuning per region; motion feel (speed streaks, camera shake on landings). Hosting later (Cloudflare
 Pages), and a title screen.
 

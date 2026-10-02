@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { BOARD } from '../game/Gear.js';
 import { WIND, sailPower } from '../world/Wind.js';
+import { buildSurferModel } from './SurferModel.js';
 
 const STEP = 1 / 120; // physics substep (s)
 const WORLD_UP = new THREE.Vector3( 0, 1, 0 );
@@ -78,7 +79,7 @@ export class Surfer {
 
 	set riderVisible( v ) {
 
-		this.rider.visible = v;
+		this.rider.visible = this.model.scarf.visible = v;
 
 	}
 
@@ -262,63 +263,12 @@ export class Surfer {
 
 	buildModel() {
 
-		const group = new THREE.Group();
-		const brass = new THREE.MeshStandardNodeMaterial( { color: 0xb8863b, metalness: 0.85, roughness: 0.35 } );
-		const wood = new THREE.MeshStandardNodeMaterial( { color: 0x6b3f22, roughness: 0.6 } );
-		const canvas = new THREE.MeshStandardNodeMaterial( { color: 0xeadcb8, roughness: 0.9, side: THREE.DoubleSide } );
-		const cloth = new THREE.MeshStandardNodeMaterial( { color: 0x2c4a6b, roughness: 0.8 } );
-		const skin = new THREE.MeshStandardNodeMaterial( { color: 0xc98f6a, roughness: 0.7 } );
-
-		// board: a flattened capsule with a brass rim, long axis +z
-		const board = new THREE.Mesh( new THREE.CapsuleGeometry( 0.32, 1.7, 4, 12 ), wood );
-		board.rotation.x = Math.PI / 2;
-		board.scale.set( 1, 1, 0.22 );
-		board.position.y = 0.08;
-		group.add( board );
-		// the rim gets its own material so it can glow as the landing cue
-		this.rimMat = new THREE.MeshStandardNodeMaterial( { color: 0xb8863b, metalness: 0.85, roughness: 0.35 } );
-		const rim = new THREE.Mesh( new THREE.TorusGeometry( 0.3, 0.045, 6, 24 ), this.rimMat );
-		rim.rotation.x = Math.PI / 2;
-		rim.scale.set( 1, 3.4, 1 );
-		rim.position.y = 0.08;
-		group.add( rim );
-
-		// mast and a triangular sail trailing back from it, rider beside the sail
-		const mast = new THREE.Mesh( new THREE.CylinderGeometry( 0.03, 0.04, 2.6, 8 ), brass );
-		mast.position.set( 0, 1.4, 0.35 );
-		group.add( mast );
-		const sailShape = new THREE.Shape();
-		sailShape.moveTo( 0, 0 );
-		sailShape.lineTo( 0, 2.2 );
-		sailShape.lineTo( 1.1, 0.15 );
-		sailShape.lineTo( 0, 0 );
-		const sail = new THREE.Mesh( new THREE.ShapeGeometry( sailShape ), canvas );
-		sail.rotation.y = Math.PI / 2;
-		sail.position.set( 0, 0.35, 0.35 );
-		group.add( sail );
-		this.sail = sail;
-
-		// rider: body, head and legs, in a pivot so it can lean and crouch
-		const rider = new THREE.Group();
-		const body = new THREE.Mesh( new THREE.CapsuleGeometry( 0.2, 0.55, 4, 10 ), cloth );
-		body.position.y = 1.2;
-		rider.add( body );
-		const head = new THREE.Mesh( new THREE.SphereGeometry( 0.15, 14, 10 ), skin );
-		head.position.y = 1.72;
-		rider.add( head );
-		const legGeo = new THREE.CapsuleGeometry( 0.08, 0.6, 3, 8 );
-		for ( const z of [ - 0.2, 0.2 ] ) {
-
-			const leg = new THREE.Mesh( legGeo, cloth );
-			leg.position.set( 0, 0.55, z );
-			rider.add( leg );
-
-		}
-		rider.position.set( 0.28, 0, - 0.45 );
-		group.add( rider );
-		this.rider = rider;
-
-		return group;
+		// the hero model lives in SurferModel.js; the rail trim's material doubles as the landing cue
+		this.model = buildSurferModel();
+		this.rimMat = this.model.rimMat;
+		this.sail = this.model.sail;
+		this.rider = this.model.rider;
+		return this.model.group;
 
 	}
 
@@ -345,7 +295,6 @@ export class Surfer {
 		this.object.quaternion.multiply( _q.setFromAxisAngle( _f.set( 0, 0, 1 ), lean + tumble * 1.3 ) );
 		this.object.position.copy( this.position );
 
-		this.rider.scale.y = 1 - this.crouch * 0.2;
 
 		// boom swings out to the downwind side: square when running, close in when reaching upwind
 		const st = sailPower( this.yaw, this.sailState );
@@ -354,6 +303,7 @@ export class Surfer {
 		const boom = - this.boomSide * Math.max( 0.25, ( Math.PI - st.theta ) / 2 );
 		this.sail.rotation.y += ( Math.PI / 2 + boom - this.sail.rotation.y ) * k;
 		this.rider.rotation.z = lean * 0.3 + tumble * 1.2;
+		this.model.update( dt, { crouch: this.crouch, throttle: Math.max( 0, controls.throttle || 0 ), side: this.boomSide } );
 
 		// landing cue: in the air the rim and a ring on the sea below glow green when lined up,
 		// amber if sketchy, red for a wipeout; the ring is stretched along the heading
