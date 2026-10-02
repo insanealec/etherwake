@@ -247,7 +247,7 @@
   clouds were liked but should be more transparent, so the sea is now see-through near you (`CLOUD.clear`,
   thin in the creases, dense on lump tops and beyond ~220 m) with a dimmer deep cloud layer
   `CLOUD.deep` = 9 m below (`buildDeepMaterial`, a child of the sea mesh) to look into.
-  Colour round (user ref: JWST "Cosmic Cliffs"): cloud palette moved from purple to nebula blue and
+  Colour round (user ref: JWST "Cosmic Cliffs"): cloud palette moved from purple to blue-violet (then back a step toward purple at the user's request) and
   lavender with deep blue/indigo creases (`cloudLit*` / `cloudShade*`); crest gold/rose and fog unchanged.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
