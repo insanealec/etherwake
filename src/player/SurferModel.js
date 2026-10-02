@@ -18,13 +18,15 @@ const BOOM_Y = 0.75; // the wishbone's height on the sail
 const UP = new THREE.Vector3( 0, 1, 0 );
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _p = new THREE.Vector3();
 
-// lay a unit-length (along +y, from 0 to len) segment mesh from a to b
+// lay a segment mesh (built by limb(), along +y) from a to b, stretched to fit exactly,
+// so the joints never show gaps
 function place( mesh, a, b ) {
 
 	mesh.position.copy( a );
 	_d.subVectors( b, a );
 	const len = _d.length();
 	mesh.quaternion.setFromUnitVectors( UP, _d.divideScalar( len || 1 ) );
+	mesh.scale.y = len / mesh.geometry.userData.len;
 
 }
 
@@ -42,7 +44,13 @@ function solveJoint( root, target, l1, l2, pole, out ) {
 }
 
 // a segment geometry from y = 0 to y = len (tapering r0 -> r1)
-const limb = ( r0, r1, len ) => new THREE.CylinderGeometry( r1, r0, len, 10 ).translate( 0, len / 2, 0 );
+const limb = ( r0, r1, len ) => {
+
+	const g = new THREE.CylinderGeometry( r1, r0, len, 10 ).translate( 0, len / 2, 0 );
+	g.userData.len = len;
+	return g;
+
+};
 
 function boardShape() {
 
@@ -163,7 +171,7 @@ export function buildSurferModel() {
 		R.pelvis.position.copy( hip );
 		for ( const leg of R.legs ) {
 
-			_a.set( hip.x, hip.y, leg.z * 0.3 );
+			_a.set( hip.x, hip.y - 0.04, leg.z * 0.09 ); // hip socket, under the pelvis
 			foot3.set( 0.02, DECK + 0.02, leg.z * 0.32 );
 			solveJoint( _a, foot3, 0.45, 0.45, KNEE_POLE, knee );
 			place( leg.thigh, _a, knee );
