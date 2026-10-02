@@ -11,10 +11,18 @@ const DEFAULTS = {
 	clearance: 1.5 // keep this far above the sea
 };
 
+// motion feel: camera shake from landings (trauma, decays) and a faint rumble at speed; the wider
+// field of view and speed lines that also come with speed are applied in App (see MOTION.speed)
+export const MOTION = {
+	shake: { perImpact: 0.07, max: 1, decay: 1.1, roll: 0.05, pitch: 0.04 }, // trauma per unit impact, cap, decay /s; max angles (rad)
+	rumble: 0.18, // shake level at full speed
+	speed: { from: 12, to: 34, fov: 9, lines: 1 } // m/s range mapped to 0..1; extra fov (deg); line strength
+};
+
 const _target = new Vector3();
 const _fwd = new Vector3();
 
-// Spring-damped chase camera behind the surfer; dips on hard landings.
+// Spring-damped chase camera behind the surfer; dips and shakes on hard landings, rumbles at speed.
 export class ChaseCamera {
 
 	// target: anything with position, velocity, speed and forward() (the surfer, the galleon)
@@ -26,6 +34,9 @@ export class ChaseCamera {
 		this.look = new Vector3();
 		this.heading = new Vector3( 0, 0, 1 );
 		this.dip = 0;
+		this.trauma = 0; // 0..1, from landings
+		this.rumble = 0; // 0..1, set from the speed each frame
+		this.t = 0;
 
 	}
 
@@ -40,6 +51,7 @@ export class ChaseCamera {
 	land( impact ) {
 
 		this.dip = Math.min( 1.5, this.dip + impact * 0.12 );
+		this.trauma = Math.min( MOTION.shake.max, this.trauma + impact * MOTION.shake.perImpact );
 
 	}
 
@@ -52,6 +64,8 @@ export class ChaseCamera {
 		this.heading.lerp( _fwd, 1 - Math.exp( - 3 * dt ) ).normalize();
 
 		this.dip *= Math.exp( - 4 * dt );
+		this.trauma = Math.max( 0, this.trauma - MOTION.shake.decay * dt );
+		this.t += dt;
 		this.place( surfer, 1 - Math.exp( - this.o.follow * dt ), 1 - Math.exp( - this.o.aim * dt ) );
 
 	}
@@ -71,6 +85,16 @@ export class ChaseCamera {
 		_target.y += this.o.lookUp;
 		this.look.lerp( _target, kLook );
 		camera.lookAt( this.look );
+
+		// shake: trauma squared (small knocks stay subtle), smooth pseudo-noise from summed sines
+		const k = this.trauma * this.trauma + this.rumble * MOTION.rumble * 0.25, t = this.t, S = MOTION.shake;
+		if ( k > 0.0005 ) {
+
+			const n = ( a, b, c ) => Math.sin( t * a + c ) * 0.6 + Math.sin( t * b + c * 2.1 ) * 0.4;
+			camera.rotateZ( n( 23, 37, 1 ) * S.roll * k );
+			camera.rotateX( n( 29, 41, 4 ) * S.pitch * k );
+
+		}
 
 	}
 

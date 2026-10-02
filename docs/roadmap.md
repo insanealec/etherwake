@@ -271,6 +271,10 @@
   portholes, verdigris copper sheathing and a brass wale stripe in the hull shader, a brass star
   figurehead, a stern balcony, a castle cornice and a fluttering mainmast pennant. Decoration only:
   collisions (`solid`) unchanged.
+- **Motion feel (2026-10-02).** `MOTION` in `core/ChaseCamera.js`: landings add camera trauma
+  (impact x 0.07, decays ~1/s) shown as roll and pitch shake (trauma squared); a faint rumble at speed.
+  Speed 12..34 m/s maps to `app.speedFx` 0..1: up to +9 degrees of field of view and speed lines
+  (`speedLines()` in `post/Cinematic.js`, `SPEED_LINES`: thin dashes streaming out at the screen edges).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -335,9 +339,8 @@
 
 ## Next up
 Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky, the
-surfer hero model, figures, galleon dressing. Next candidates, biggest impact first: bloom and exposure
-tuning per region; motion feel (speed streaks, camera shake on landings). Hosting later (Cloudflare
-Pages), and a title screen.
+surfer hero model, figures, galleon dressing, motion feel. Next: bloom and exposure tuning per region,
+then a title screen. Hosting later (Cloudflare Pages), only when the user asks.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

@@ -1,18 +1,18 @@
 import * as THREE from 'three/webgpu';
-import { Fn, pass, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
+import { Fn, uniform, pass, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium, bowHeightAt, flareHeightAt } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
 import { Moon } from './sky/Moon.js';
 import { SunFlare } from './post/SunFlare.js';
-import { godRays, grade } from './post/Cinematic.js';
+import { godRays, grade, speedLines } from './post/Cinematic.js';
 import { Motes, MOTE_LAYERS } from './sea/Motes.js';
 import { Shells } from './sea/Shells.js';
 import { Puffs } from './sea/Puffs.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
-import { ChaseCamera } from './core/ChaseCamera.js';
+import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
 import { Port } from './world/Port.js';
@@ -184,6 +184,7 @@ export class App {
 	buildPipeline() {
 
 		this.pipeline = new THREE.RenderPipeline( this.renderer );
+		this.uSpeedFx = uniform( 0 ); // 0..1 from the board's speed: speed lines (see MOTION.speed)
 		const scene = pass( this.scene, this.camera ).getTextureNode( 'output' );
 		// gravitational lensing around the Rim's black hole: pixels near it sample the scene closer to
 		// its centre (so what's behind is magnified outward into an Einstein ring), and the horizon is black
@@ -210,6 +211,7 @@ export class App {
 		if ( this.cinematic ) {
 
 			out = out.add( godRays( scene, this.flare.uSun, this.flare.uVis ) );
+			out = out.add( speedLines( this.uSpeedFx, this.sea.uTime ) );
 			this.pipeline.outputNode = grade( out.rgb.mul( horizon ), this.sea.uTime );
 
 		} else this.pipeline.outputNode = vec4( out.rgb.mul( horizon ), 1 );
@@ -342,7 +344,13 @@ export class App {
 		}
 		// boost: the field of view widens briefly and eases back
 		this.fovKick = ( this.fovKick || 0 ) * Math.exp( - 2.5 * dt );
-		const fov = 60 + this.fovKick * 14;
+		// speed: a wider view, speed lines and a faint rumble build up as you go faster
+		const M = MOTION.speed;
+		const want = surf ? Math.max( 0, Math.min( 1, ( this.surfer.speed - M.from ) / ( M.to - M.from ) ) ) : 0;
+		this.speedFx = ( this.speedFx || 0 ) + ( want - ( this.speedFx || 0 ) ) * ( 1 - Math.exp( - 3 * dt ) );
+		this.uSpeedFx.value = this.speedFx * M.lines;
+		this.chase.rumble = this.speedFx;
+		const fov = 60 + this.fovKick * 14 + this.speedFx * M.fov;
 		if ( Math.abs( fov - this.camera.fov ) > 0.01 ) {
 
 			this.camera.fov = fov;

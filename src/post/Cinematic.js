@@ -1,4 +1,4 @@
-import { Fn, vec2, vec3, vec4, float, max, dot, mix, length, smoothstep, fract, sin, screenUV, screenSize, Loop } from 'three/tsl';
+import { Fn, vec2, vec3, vec4, float, max, dot, mix, length, smoothstep, fract, sin, floor, abs, atan, screenUV, screenSize, Loop } from 'three/tsl';
 
 // The cinematic finish for the post pipeline (milestone 8 polish):
 // - godRays(): light shafts streaming from the sun, a radial blur of the bright parts of the scene
@@ -53,6 +53,30 @@ export function grade( colour, time ) {
 		const p = screenUV.mul( screenSize ).add( time.mul( 61.7 ) );
 		const grain = fract( sin( dot( p, vec2( 12.9898, 78.233 ) ) ).mul( 43758.5453 ) ).sub( 0.5 ).mul( C.grain );
 		return vec4( toned.mul( vig ).add( grain ), 1 );
+
+	} )();
+
+}
+
+// Speed lines: thin dashes streaming outward from the middle of the screen, only near the edges.
+// amount: 0..1 float node (from the speed); time: float node
+export const SPEED_LINES = { count: 110, density: 0.35, colour: [ 1.0, 0.86, 0.72 ], strength: 0.22 };
+export function speedLines( amount, time ) {
+
+	const L = SPEED_LINES;
+	return Fn( () => {
+
+		const d = screenUV.sub( 0.5 ).mul( vec2( screenSize.x.div( screenSize.y ), 1 ) );
+		const r = length( d );
+		const a = atan( d.y, d.x ).div( Math.PI * 2 ).add( 0.5 ).mul( L.count );
+		const id = floor( a );
+		const h = fract( sin( id.mul( 12.9898 ) ).mul( 43758.5453 ) );
+		const on = smoothstep( 1 - L.density, 1 - L.density + 0.02, h );
+		const thin = smoothstep( 0.18, 0.0, abs( fract( a ).sub( 0.5 ) ) );
+		const s = fract( r.mul( 1.6 ).sub( time.mul( h.mul( 1.5 ).add( 1.8 ) ) ).add( h.mul( 7.0 ) ) );
+		const dash = smoothstep( 0.0, 0.08, s ).mul( smoothstep( 0.55, 0.15, s ) );
+		const edge = smoothstep( 0.28, 0.62, r );
+		return vec3( ...L.colour ).mul( on.mul( thin ).mul( dash ).mul( edge ).mul( amount ).mul( L.strength ) );
 
 	} )();
 
