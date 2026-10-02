@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import {
 	Fn, uniform, float, vec2, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, select,
 	positionGeometry, attribute, round, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
-	mx_fractal_noise_float, mx_noise_float, mx_noise_vec3, reflect
+	mx_fractal_noise_float, mx_noise_float, mx_noise_vec3, Loop
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
 import { HARBOR, REGIONS } from '../world/WorldLayout.js';
@@ -240,6 +240,10 @@ export const PALETTE = {
 
 export const FOG = { above: 0.0011, below: 0.03 };
 
+// The sea's gas volume look (see the colour shader): how far into the gas each pixel looks, in how many
+// steps, how strongly the gas glows and how quickly it hides what's behind it
+export const GAS = { depth: 9, steps: 8, glow: 0.8, absorb: 1.1 };
+
 // Precomputed per-wave constants from the WAVES table (shared by JS and TSL).
 function waveConstants() {
 
@@ -415,34 +419,40 @@ export class Etherium {
 			const V = normalize( cameraPosition.sub( P ) );
 			const L = this.uSunDir;
 
-			// fine ripples: two scrolling noise layers tilt the per-pixel normal near the camera (faded out
-			// with distance so they don't shimmer), and ripple the brightness so the surface has texture
-			const near = smoothstep( 240, 25, length( cameraPosition.sub( P ) ) );
-			const r1 = mx_noise_vec3( vec3( P.xz.mul( 0.16 ).sub( vec2( 0.9, 0.25 ).mul( t ) ), t.mul( 0.22 ) ) );
-			const r2 = mx_noise_vec3( vec3( P.xz.mul( 0.62 ).add( vec2( 0.3, 1.1 ).mul( t ) ), t.mul( 0.55 ) ) );
-			const Nd = normalize( N.add( vec3( r1.x.mul( 0.38 ).add( r2.x.mul( 0.2 ) ), 0, r1.z.mul( 0.38 ).add( r2.z.mul( 0.2 ) ) ).mul( near ) ) );
-
-			// gas texture: domain-warped clouds drifting downwind, plus fine wisps stretched along the flow
-			const uvw = P.xz.sub( vec2( 1.6, 0.4 ).mul( t ) );
-			const wx = mx_fractal_noise_float( vec3( uvw.mul( 0.011 ), t.mul( 0.03 ) ), 3, 2.0, 0.5 );
-			const wz = mx_fractal_noise_float( vec3( uvw.mul( 0.011 ).add( 5.2 ), t.mul( 0.03 ) ), 3, 2.0, 0.5 );
-			const q = uvw.add( vec2( wx, wz ).mul( 16.0 ) );
-			const big = mx_fractal_noise_float( vec3( q.mul( 0.035 ), t.mul( 0.05 ) ), 5, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 ).clamp();
-			const wisps = mx_fractal_noise_float( vec3( q.x.mul( 0.08 ), q.y.mul( 0.13 ), t.mul( 0.12 ) ), 3, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 ).clamp();
-			const dens = smoothstep( 0.3, 0.78, big.mul( 0.65 ).add( wisps.mul( 0.35 ) ) );
+			// The gas: from this point, step a short way down into the etherium along the view ray (bent
+			// downward, so grazing views still sink in) and gather glowing density from swirling 3D noise.
+			// Layers at different depths parallax past each other: it reads as looking into gas, not at a skin.
 			const tint = mx_noise_float( vec3( P.xz.mul( 0.005 ), t.mul( 0.02 ) ) ).mul( 0.5 ).add( 0.5 ).clamp();
-
-			// troughs teal/violet, crests gold/rose; glow rises with height and gas density
 			const crest = smoothstep( - 0.3, 0.75, vCrest );
 			const trough = mix( c( 'troughA' ), c( 'troughB' ), tint );
 			const hot = mix( c( 'crestA' ), c( 'crestB' ), tint.oneMinus() );
-			// thin gas goes nearly dark, dense gas glows; the densest filaments run hot
-			const lum = mix( float( 0.1 ), float( 1.0 ), dens ).mul( mix( float( 0.55 ), float( 1.35 ), crest ) );
-			const col = mix( trough, hot, crest.mul( crest ) ).mul( lum ).add( hot.mul( pow( dens, 3 ) ).mul( 0.3 ) ).toVar();
+			const top = mix( trough, hot, crest.mul( crest ) ); // the colour near the surface
+			const deep = mix( c( 'troughB' ), c( 'troughA' ), tint ).mul( 0.7 ); // and deeper in
 
-			// soft sun-facing shading keeps the swell slopes readable (diffuse, not a glassy highlight)
-			col.mulAssign( mix( float( 0.55 ), float( 1.25 ), dot( Nd, L ).mul( 0.5 ).add( 0.5 ) ) );
-			col.mulAssign( r2.y.mul( 0.22 ).mul( near ).add( 1 ) );
+			const Vd = V.negate();
+			const ray = normalize( vec3( Vd.x, Vd.y.min( - 0.3 ), Vd.z ) );
+			const flow = vec3( 1.6, 0, 0.4 ).mul( t );
+			const warp = mx_noise_vec3( vec3( P.xz.mul( 0.008 ), t.mul( 0.02 ) ) ).mul( 14 ); // big slow swirls
+			const emit = vec3( 0 ).toVar();
+			const trans = float( 1 ).toVar();
+			const dens = float( 0 ).toVar(); // density nearest the surface (for the glow effects below)
+			const STEPS = GAS.steps, SPACING = GAS.depth / STEPS;
+			Loop( STEPS, ( { i } ) => {
+
+				const d = float( i ).add( 0.5 ).mul( SPACING );
+				const q = P.add( ray.mul( d ) ).sub( flow ).add( warp );
+				const n = mx_fractal_noise_float( q.mul( vec3( 0.035, 0.07, 0.035 ) ).add( vec3( 0, t.mul( 0.06 ), 0 ) ), 3, 2.0, 0.55 ).mul( 0.5 ).add( 0.5 );
+				const k = d.div( GAS.depth );
+				const rho = smoothstep( 0.38, 0.8, n ).mul( k.mul( 0.9 ).add( 0.35 ) ); // patchy on top, fuller deeper
+				dens.assign( select( i.equal( 0 ), rho, dens ) );
+				emit.addAssign( mix( top, deep, k ).mul( rho ).mul( trans ).mul( GAS.glow ) );
+				trans.mulAssign( rho.mul( - GAS.absorb ).exp() );
+
+			} );
+			const col = emit.mul( mix( float( 0.6 ), float( 1.35 ), crest ) ).add( deep.mul( 0.12 ).mul( trans ) ).toVar();
+
+			// soft sun-facing shading keeps the swell shapes readable (gentle, gas has no hard highlight)
+			col.mulAssign( mix( float( 0.75 ), float( 1.15 ), dot( N, L ).mul( 0.5 ).add( 0.5 ) ) );
 
 			// glowing puffs where crests pinch (low Jacobian), instead of white foam
 			const puff = smoothstep( 0.65, 0.3, vJacobian ).mul( dens );
@@ -457,13 +467,6 @@ export class Etherium {
 			// back-lit gas: looking toward the sun, thin gas glows (a silver lining instead of a glint)
 			const back = pow( max( dot( V.negate(), L ), 0 ), 6 ).mul( dens );
 			col.addAssign( c( 'sun' ).mul( back ).mul( 0.9 ) );
-
-			// a soft sheen where the sun catches the ripples, and the sky mirrored at grazing angles
-			const R = reflect( V.negate(), Nd );
-			const sheen = pow( max( dot( R, L ), 0 ), 48 ).mul( 0.9 ).add( pow( max( dot( R, L ), 0 ), 6 ).mul( 0.08 ) );
-			col.addAssign( c( 'sun' ).mul( sheen ).mul( dens.mul( 0.6 ).add( 0.4 ) ) );
-			const sky = mix( this.uFogColor.mul( 2.5 ), vec3( 0.06, 0.03, 0.14 ), R.y.max( 0 ).sqrt() );
-			col.addAssign( sky.mul( pow( max( dot( Nd, V ), 0 ).oneMinus(), 4 ) ).mul( 0.25 ) );
 
 			// grazing angles look through more gas: thicken toward the fog colour
 			const thick = pow( max( dot( N, V ), 0 ).oneMinus(), 6 );

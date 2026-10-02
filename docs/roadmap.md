@@ -225,6 +225,15 @@
   game logic 5.1 -> 0.85 ms per frame. **Measurement gotcha:** with the Claude window behind others the
   pane is throttled and `benchmark()` reports ~18 ms regardless of resolution; trust CPU timings
   (`frame()` with `pipeline.render` stubbed) or ask the user for an fps reading.
+- **Gas sea (2026-10-02),** user: waves should be "less like water waves, more like a gas nebula... not
+  the balls we ride through, but more gassy". The sea's colour shader now ray-marches a short way into
+  the gas (`GAS` in `Etherium.js`: 9 m in 8 steps along the view ray, bent downward so grazing views sink
+  in), gathering glowing density from domain-warped 3D noise (patchy near the surface, fuller deeper;
+  hot crest colours near the top, teal/violet deeper) with absorption, so layers parallax like a volume.
+  The water cues from pass 1 are gone (ripple normals, sun sheen, sky reflection); the back-lit glow
+  stays. Gas shells are thicker and taller (0.7 / 1.6 / 2.7 / 4.0 m, strength 0.3) so crests fray into
+  mist; motes are dimmer and the near layer sparser (accents, not the main event). Swell shapes and
+  physics unchanged.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

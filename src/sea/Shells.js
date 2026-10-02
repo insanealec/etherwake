@@ -9,8 +9,8 @@ import { etheriumWaves, PALETTE } from './Etherium.js';
 // etherium reads as a thick layer you ride through (knee to waist deep) rather than a skin.
 // Each shell drifts at its own speed for parallax. Coarser grid and cheaper noise than the sea.
 export const SHELLS = {
-	heights: [ 0.6, 1.2, 1.9 ], // metres above the surface
-	strength: 0.22, // brightness of the lowest shell; higher shells are fainter
+	heights: [ 0.7, 1.6, 2.7, 4.0 ], // metres above the surface: the gas frays upward off the crests
+	strength: 0.3, // brightness of the lowest shell; higher shells are fainter
 	segments: 256
 };
 

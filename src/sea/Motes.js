@@ -9,7 +9,7 @@ import { etheriumWaves, PALETTE } from './Etherium.js';
 // The wide layer fills the view; the near layer is small, dense motes right around the camera.
 export const MOTE_LAYERS = {
 	wide: { grid: 256, cell: 1.4, far: 150, size: 0.1, sizeRange: 0.18, seed: 0 },
-	near: { grid: 128, cell: 0.5, far: 30, size: 0.04, sizeRange: 0.08, seed: 91.7 }
+	near: { grid: 96, cell: 0.7, far: 30, size: 0.04, sizeRange: 0.06, seed: 91.7 }
 };
 
 const hash = ( p ) => fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ).mul( 43758.5453 ) );
@@ -74,7 +74,7 @@ export class Motes {
 		} )();
 
 		const soft = smoothstep( 0.5, 0.0, length( uv().sub( 0.5 ) ) );
-		mat.colorNode = vTint.mul( 1.4 );
+		mat.colorNode = vTint.mul( 1.0 ); // accents in the gas, not the main event
 		mat.opacityNode = soft.mul( soft ).mul( vFade );
 
 		this.mesh = new THREE.Sprite( mat );
