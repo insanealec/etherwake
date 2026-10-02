@@ -249,6 +249,13 @@
   `CLOUD.deep` = 9 m below (`buildDeepMaterial`, a child of the sea mesh) to look into.
   Colour round (user ref: JWST "Cosmic Cliffs"): cloud palette moved from purple to blue-violet (then back a step toward purple at the user's request) and
   lavender with deep blue/indigo creases (`cloudLit*` / `cloudShade*`); crest gold/rose and fog unchanged.
+- **Graphics pass 2, slice 1: nebula cliffs (2026-10-02).** In the sky backdrop (`sky/Starfield.js`,
+  `NEBULA` table): banks of gas rise from the horizon all round, after the JWST "Cosmic Cliffs" photo the
+  user shared. Domain-warped fbm billows under a per-azimuth height profile; fake volume lighting compares
+  the density with the density a step toward the sun (lit amber edges, rust bodies, dark folds); blue gas
+  glows just above the tops; the low parts fade into the horizon colour (aerial perspective); the sun dims
+  behind them. Also: `WhaleSong` no longer throws every frame if audio started before it was built (seen
+  after a hot reload).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -312,10 +319,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Graphics pass 2 (the user wants it closer to Tidewater's polish). Candidates, biggest impact first:
-volumetric-looking nebula cloud banks in the sky with aerial perspective; better hero models (board,
-rider, sail; the galleon); bloom and exposure tuning per region; motion feel (speed streaks, camera
-shake on landings). Hosting later (Cloudflare Pages), and a title screen.
+Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky. Next
+candidates, biggest impact first: better hero models (board, rider, sail; the galleon); bloom and exposure
+tuning per region; motion feel (speed streaks, camera shake on landings). Hosting later (Cloudflare
+Pages), and a title screen.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

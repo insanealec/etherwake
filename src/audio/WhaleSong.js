@@ -20,6 +20,7 @@ export class WhaleSong {
 		this.time = 0;
 		for ( const w of this.whales ) w.nextCall = rand( 2, 10 );
 		audio.onStart.push( ( ctx ) => this.setup( ctx ) );
+		if ( audio.ctx ) this.setup( audio.ctx ); // audio already started (e.g. after a hot reload)
 
 	}
 
@@ -95,6 +96,7 @@ export class WhaleSong {
 		for ( const w of this.whales ) {
 
 			const m = w.mesh.position;
+			if ( ! w.panner ) continue;
 			w.panner.positionX.value = m.x;
 			w.panner.positionY.value = m.y;
 			w.panner.positionZ.value = m.z;
