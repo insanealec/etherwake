@@ -16,6 +16,7 @@ export const RINGS = {
 	tint: {
 		fog: [ 0.03, 0.09, 0.16 ],
 		sea: [ 0.45, 0.85, 1.25 ], // frosty blue
-		recolor: 0.85 // mostly repaint the sea in the tint (keeping its brightness)
+		recolor: 0.85, // mostly repaint the sea in the tint (keeping its brightness)
+		look: { exposure: 1.05, bloom: 0.4, saturation: 1.0 } // crisp and cool
 	}
 };

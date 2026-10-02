@@ -116,7 +116,7 @@ export class Puffs {
 			const col = cloudColor( N, sea.uSunDir, V, crest, vTint, mix( float( 0.6 ), float( 1 ), s.z ), c );
 			// thin, translucent edges glow a little: the outline of each billow catches the light
 			const rim = smoothstep( 0.55, 0.95, s.w ).mul( 0.35 );
-			return col.add( mix( c( 'cloudLitA' ), c( 'cloudLitB' ), vTint ).mul( rim ) );
+			return sea.regionTint( col.add( mix( c( 'cloudLitA' ), c( 'cloudLitB' ), vTint ).mul( rim ) ) );
 
 		} )();
 

@@ -21,6 +21,8 @@ export const REACH = {
 // Region atmosphere inside the Reach (linear colours)
 export const FLARE_TINT = {
 	fog: [ 0.2, 0.05, 0.015 ],
-	sea: [ 1.35, 0.7, 0.4 ], // multiplies the sea's colour
-	glow: [ 1.0, 0.45, 0.1 ] // added along the front's face, scaled by its height
+	sea: [ 1.7, 0.62, 0.16 ], // the sea's colour in the Reach: molten amber
+	recolor: 0.8, // mostly repaint the (blue-violet) clouds amber, keeping their brightness
+	glow: [ 1.0, 0.45, 0.1 ], // added along the front's face, scaled by its height
+	look: { exposure: 1.12, bloom: 0.8, saturation: 1.22 } // hotter and more glowing (see LOOK in post/Cinematic.js)
 };

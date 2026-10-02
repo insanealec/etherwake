@@ -496,8 +496,7 @@ export class Etherium {
 
 			// regions tint the sea (the Flare Reach runs hotter, the Ring Reach frostier);
 			// a flare-front's face glows like molten gold
-			const recolor = mix( col.mul( this.uRegionSea ), vec3( dot( col, vec3( 0.3, 0.55, 0.15 ) ) ).mul( this.uRegionSea ).mul( 1.6 ), this.uRegionRecolor );
-			col.assign( mix( col, recolor, this.uFlareMix ) );
+			col.assign( this.regionTint( col ) );
 			col.addAssign( vec3( ...FLARE_TINT.glow ).mul( pow( flareHeight( P.xz ).div( FLARES.height ), 2 ) ).mul( 0.55 ) );
 
 			// distant cloud tops soften into the haze
@@ -521,6 +520,15 @@ export class Etherium {
 		} )();
 
 		return mat;
+
+	}
+
+	// TSL: a region's tint on a cloud colour (multiply, or repaint keeping brightness), blended in as you
+	// enter. Shared by the sea, its deep layer and the cloud puffs.
+	regionTint( col ) {
+
+		const recolor = mix( col.mul( this.uRegionSea ), vec3( dot( col, vec3( 0.3, 0.55, 0.15 ) ) ).mul( this.uRegionSea ).mul( 1.6 ), this.uRegionRecolor );
+		return mix( col, recolor, this.uFlareMix );
 
 	}
 
@@ -554,7 +562,7 @@ export class Etherium {
 			const b = billow( P.xz.mul( 0.5 ).add( 40 ), t.mul( 0.5 ), float( 0 ) );
 			const crest = smoothstep( - 0.3, 0.9, vCrest );
 			const base = mix( mix( c( 'cloudShadeA' ), c( 'cloudShadeB' ), tint ), mix( c( 'cloudLitA' ), c( 'cloudLitB' ), tint ).mul( 0.55 ), b.occ );
-			return base.add( mix( c( 'crestA' ), c( 'crestB' ), tint ).mul( crest.mul( crest ) ).mul( 0.3 ) );
+			return this.regionTint( base.add( mix( c( 'crestA' ), c( 'crestB' ), tint ).mul( crest.mul( crest ) ).mul( 0.3 ) ) );
 
 		} )();
 

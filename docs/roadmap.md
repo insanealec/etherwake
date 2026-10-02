@@ -275,6 +275,12 @@
   (impact x 0.055, decays ~1/s; toned down once at the user's request) shown as roll and pitch shake (trauma squared); a faint rumble at speed.
   Speed 12..34 m/s maps to `app.speedFx` 0..1: up to +9 degrees of field of view and speed lines
   (`speedLines()` in `post/Cinematic.js`, `SPEED_LINES`: thin dashes streaming out at the screen edges).
+- **Per-region look (2026-10-02).** `LOOK` in `post/Cinematic.js` (open sea: exposure 1.0, bloom 0.55,
+  saturation 1.15); each region's `tint.look` overrides it (Flare Reach hotter and glowier, Ring Reach
+  crisp with less bloom, the Rim darker), blended by `Regions.look` and applied in App (tone-mapping
+  exposure, `bloom.strength`, `uSaturation` in the grade). The region sea tint now goes through
+  `Etherium.regionTint()`, shared by the sea, its deep layer and the puffs (before, the see-through
+  layers stayed violet everywhere). The Flare Reach repaints the clouds molten amber (`recolor: 0.8`).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -339,8 +345,7 @@
 
 ## Next up
 Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky, the
-surfer hero model, figures, galleon dressing, motion feel. Next: bloom and exposure tuning per region,
-then a title screen. Hosting later (Cloudflare Pages), only when the user asks.
+surfer hero model, figures, galleon dressing, motion feel, per-region look. Next: a title screen. Hosting later (Cloudflare Pages), only when the user asks.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

@@ -1,4 +1,4 @@
-import { Fn, vec2, vec3, vec4, float, max, dot, mix, length, smoothstep, fract, sin, floor, abs, atan, screenUV, screenSize, Loop } from 'three/tsl';
+import { Fn, uniform, vec2, vec3, vec4, float, max, dot, mix, length, smoothstep, fract, sin, floor, abs, atan, screenUV, screenSize, Loop } from 'three/tsl';
 
 // The cinematic finish for the post pipeline (milestone 8 polish):
 // - godRays(): light shafts streaming from the sun, a radial blur of the bright parts of the scene
@@ -6,9 +6,14 @@ import { Fn, vec2, vec3, vec4, float, max, dot, mix, length, smoothstep, fract, 
 // - grade(): a little extra saturation, split toning (violet shadows, warm highlights), a vignette and
 //   a whisper of film grain.
 // Tuning lives in CINEMATIC; it's applied before the pipeline's tone mapping (ACES, set in App).
+// The open sea's look; each region can override it (`tint.look` in game/Flares.js, Rings.js, Rim.js),
+// blended in as you enter (world/Regions.js) and applied in App: tone-mapping exposure, bloom strength
+// and the grade's saturation.
+export const LOOK = { exposure: 1.0, bloom: 0.55, saturation: 1.15 };
+export const uSaturation = uniform( LOOK.saturation );
+
 export const CINEMATIC = {
 	rays: { samples: 48, density: 0.85, decay: 0.955, weight: 0.07, threshold: 0.75 },
-	saturation: 1.15,
 	shadows: [ 0.9, 0.88, 1.15 ], // multiplies the darks: lifted toward violet
 	highlights: [ 1.07, 1.0, 0.9 ], // multiplies the brights: warm
 	vignette: 0.32, // how much the corners darken
@@ -46,7 +51,7 @@ export function grade( colour, time ) {
 	return Fn( () => {
 
 		const luma = dot( colour, vec3( 0.2126, 0.7152, 0.0722 ) );
-		const sat = mix( vec3( luma ), colour, C.saturation );
+		const sat = mix( vec3( luma ), colour, uSaturation );
 		const toned = sat.mul( mix( vec3( ...C.shadows ), vec3( ...C.highlights ), smoothstep( 0.02, 0.8, luma ) ) );
 		const d = length( screenUV.sub( 0.5 ).mul( vec2( screenSize.x.div( screenSize.y ), 1 ) ) );
 		const vig = smoothstep( 1.05, 0.3, d ).mul( C.vignette ).add( 1 - C.vignette );

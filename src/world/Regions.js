@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { uv, vec3, float, smoothstep, length, positionWorld, cameraPosition, mx_noise_float } from 'three/tsl';
 import { REGIONS } from './WorldLayout.js';
 import { FLARES, FLARE_TINT, REACH } from '../game/Flares.js';
+import { LOOK } from '../post/Cinematic.js';
 import { RINGS } from '../game/Rings.js';
 import { RIM } from '../game/Rim.js';
 import { setFlareRegion, setFlare, FRONTS } from '../sea/Etherium.js';
@@ -45,6 +46,7 @@ export class Regions {
 		];
 		this.flareRegion = this.list[ 0 ];
 		this.active = null; // the region you're inside
+		this.look = { ...LOOK }; // blended exposure, bloom and saturation (applied in App)
 		this.fronts = Array.from( { length: FRONTS }, () => ( { age: - 1, stones: [] } ) );
 
 		// the ember column: tall, soft-edged, flickering, visible through the haze, faded up close
@@ -126,6 +128,8 @@ export class Regions {
 		this.sea.regionFog.setRGB( ...top.tint.fog );
 		this.sea.uRegionSea.value.setRGB( ...top.tint.sea );
 		this.sea.uRegionRecolor.value = top.tint.recolor ?? 0;
+		// the look (exposure, bloom, saturation) blends from the open sea's toward the region's
+		for ( const k in LOOK ) this.look[ k ] = LOOK[ k ] + ( ( top.tint.look?.[ k ] ?? LOOK[ k ] ) - LOOK[ k ] ) * top.mix;
 		const mix = this.flareRegion.mix;
 
 		// the flare cycle: a warning, then a new front launches from the sunward edge

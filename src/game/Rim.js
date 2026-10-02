@@ -16,7 +16,8 @@ export const RIM = {
 	tint: {
 		fog: [ 0.05, 0.02, 0.1 ],
 		sea: [ 0.65, 0.35, 1.25 ], // violet
-		recolor: 0.7
+		recolor: 0.7,
+		look: { exposure: 0.85, bloom: 0.65, saturation: 0.95 } // dark and eerie
 	},
 	hole: {
 		height: 1100, // above the sea
