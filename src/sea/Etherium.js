@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import {
 	Fn, uniform, float, vec2, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, select,
 	positionGeometry, attribute, round, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
-	mx_fractal_noise_float, mx_noise_float
+	mx_fractal_noise_float, mx_noise_float, mx_noise_vec3, reflect
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
 import { HARBOR, REGIONS } from '../world/WorldLayout.js';
@@ -415,6 +415,13 @@ export class Etherium {
 			const V = normalize( cameraPosition.sub( P ) );
 			const L = this.uSunDir;
 
+			// fine ripples: two scrolling noise layers tilt the per-pixel normal near the camera (faded out
+			// with distance so they don't shimmer), and ripple the brightness so the surface has texture
+			const near = smoothstep( 240, 25, length( cameraPosition.sub( P ) ) );
+			const r1 = mx_noise_vec3( vec3( P.xz.mul( 0.16 ).sub( vec2( 0.9, 0.25 ).mul( t ) ), t.mul( 0.22 ) ) );
+			const r2 = mx_noise_vec3( vec3( P.xz.mul( 0.62 ).add( vec2( 0.3, 1.1 ).mul( t ) ), t.mul( 0.55 ) ) );
+			const Nd = normalize( N.add( vec3( r1.x.mul( 0.38 ).add( r2.x.mul( 0.2 ) ), 0, r1.z.mul( 0.38 ).add( r2.z.mul( 0.2 ) ) ).mul( near ) ) );
+
 			// gas texture: domain-warped clouds drifting downwind, plus fine wisps stretched along the flow
 			const uvw = P.xz.sub( vec2( 1.6, 0.4 ).mul( t ) );
 			const wx = mx_fractal_noise_float( vec3( uvw.mul( 0.011 ), t.mul( 0.03 ) ), 3, 2.0, 0.5 );
@@ -434,7 +441,8 @@ export class Etherium {
 			const col = mix( trough, hot, crest.mul( crest ) ).mul( lum ).add( hot.mul( pow( dens, 3 ) ).mul( 0.3 ) ).toVar();
 
 			// soft sun-facing shading keeps the swell slopes readable (diffuse, not a glassy highlight)
-			col.mulAssign( mix( float( 0.6 ), float( 1.2 ), dot( N, L ).mul( 0.5 ).add( 0.5 ) ) );
+			col.mulAssign( mix( float( 0.55 ), float( 1.25 ), dot( Nd, L ).mul( 0.5 ).add( 0.5 ) ) );
+			col.mulAssign( r2.y.mul( 0.22 ).mul( near ).add( 1 ) );
 
 			// glowing puffs where crests pinch (low Jacobian), instead of white foam
 			const puff = smoothstep( 0.65, 0.3, vJacobian ).mul( dens );
@@ -449,6 +457,13 @@ export class Etherium {
 			// back-lit gas: looking toward the sun, thin gas glows (a silver lining instead of a glint)
 			const back = pow( max( dot( V.negate(), L ), 0 ), 6 ).mul( dens );
 			col.addAssign( c( 'sun' ).mul( back ).mul( 0.9 ) );
+
+			// a soft sheen where the sun catches the ripples, and the sky mirrored at grazing angles
+			const R = reflect( V.negate(), Nd );
+			const sheen = pow( max( dot( R, L ), 0 ), 48 ).mul( 0.9 ).add( pow( max( dot( R, L ), 0 ), 6 ).mul( 0.08 ) );
+			col.addAssign( c( 'sun' ).mul( sheen ).mul( dens.mul( 0.6 ).add( 0.4 ) ) );
+			const sky = mix( this.uFogColor.mul( 2.5 ), vec3( 0.06, 0.03, 0.14 ), R.y.max( 0 ).sqrt() );
+			col.addAssign( sky.mul( pow( max( dot( Nd, V ), 0 ).oneMinus(), 4 ) ).mul( 0.25 ) );
 
 			// grazing angles look through more gas: thicken toward the fog colour
 			const thick = pow( max( dot( N, V ), 0 ).oneMinus(), 6 );

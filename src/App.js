@@ -6,6 +6,7 @@ import { Etherium, bowHeightAt, flareHeightAt } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
 import { Moon } from './sky/Moon.js';
 import { SunFlare } from './post/SunFlare.js';
+import { godRays, grade } from './post/Cinematic.js';
 import { Motes, MOTE_LAYERS } from './sea/Motes.js';
 import { Shells } from './sea/Shells.js';
 import { TweakPanel } from './ui/TweakPanel.js';
@@ -69,6 +70,9 @@ export class App {
 		this.renderer = new THREE.WebGPURenderer( { antialias: true } );
 		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
+		// ACES keeps the nebula colours vivid (AgX washed them grey); ?noCinematic turns off the
+		// cinematic post (god rays, grade) for comparison
+		this.cinematic = ! this.params.has( 'noCinematic' );
 		this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 		this.renderer.toneMappingExposure = 1.0;
 		container.appendChild( this.renderer.domElement );
@@ -201,7 +205,12 @@ export class App {
 			out = out.add( this.bloom );
 
 		}
-		this.pipeline.outputNode = vec4( out.rgb.mul( horizon ), 1 );
+		if ( this.cinematic ) {
+
+			out = out.add( godRays( scene, this.flare.uSun, this.flare.uVis ) );
+			this.pipeline.outputNode = grade( out.rgb.mul( horizon ), this.sea.uTime );
+
+		} else this.pipeline.outputNode = vec4( out.rgb.mul( horizon ), 1 );
 
 	}
 
