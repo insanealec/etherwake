@@ -252,7 +252,10 @@ export const CLOUD = {
 	fine: { cell: 3, amp: 0.5 }, // per-pixel lumps on the billows
 	drift: [ 0.9, 0.25 ], // m/s
 	wrap: 0.2, // diffuse wrap: how far light creeps round the billows
-	glow: 0.5 // how much the crest colours glow from within
+	glow: 0.5, // how much the crest colours glow from within
+	clear: 0.45, // opacity of the thinnest gas near you (the creases); the lump tops are denser
+	clearNear: 25, clearFar: 220, // see-through near the camera, fully dense by clearFar
+	deep: 9 // metres: a dimmer cloud layer below, seen through the top one
 };
 // billow noise: |noise| has rounded tops and creased valleys, like the lumps on a cumulus
 const lumps = ( q, t, seed ) => mx_noise_float( vec3( q, t.mul( 0.04 ).add( seed ) ) ).abs().mul( 1.6 ).clamp();
@@ -375,7 +378,13 @@ export class Etherium {
 
 		this.mesh = new THREE.Mesh( this.buildGeometry(), this.buildMaterial() );
 		this.mesh.frustumCulled = false;
+		this.mesh.renderOrder = - 1; // before the other see-through things (the puffs fade against its depth)
 		scene.add( this.mesh );
+
+		// the deeper cloud layer, seen through the top one (a child, so it follows the grid)
+		this.deep = new THREE.Mesh( this.buildGeometry( 256 ), this.buildDeepMaterial() );
+		this.deep.frustumCulled = false;
+		this.mesh.add( this.deep );
 
 	}
 
@@ -429,7 +438,7 @@ export class Etherium {
 
 	buildMaterial() {
 
-		const mat = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide } );
+		const mat = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, transparent: true, depthWrite: true } );
 		const vNormal = varyingProperty( 'vec3', 'vEwNormal' );
 		const vWorld = varyingProperty( 'vec3', 'vEwWorld' );
 		const vCrest = varyingProperty( 'float', 'vEwCrest' );
@@ -497,6 +506,55 @@ export class Etherium {
 			// underside: a dim violet glow seen through the fog
 			const under = c( 'underside' ).mul( b0.occ.mul( 0.8 ).add( 0.3 ) ).add( c( 'crestB' ).mul( crest.mul( 0.25 ) ) );
 			return select( frontFacing, col, under );
+
+		} )();
+
+		// see-through gas: thin in the creases near you, dense on the lump tops and further out
+		mat.opacityNode = Fn( () => {
+
+			const P = vWorld;
+			const dist = length( cameraPosition.sub( P ) );
+			const b = billow( P.xz, this.uTime, smoothstep( 160.0, 40.0, dist ) );
+			const thin = mix( float( CLOUD.clear ), float( 1 ), b.occ.mul( b.occ ) );
+			return select( frontFacing, mix( thin, float( 1 ), smoothstep( CLOUD.clearNear, CLOUD.clearFar, dist ) ), float( 1 ) );
+
+		} )();
+
+		return mat;
+
+	}
+
+	// The deep layer: a dimmer, slower copy of the swell CLOUD.deep metres down, glowing faintly through
+	// the clear patches of the top layer, so you look into the cloud rather than at a skin.
+	buildDeepMaterial() {
+
+		const mat = new THREE.MeshBasicNodeMaterial();
+		const vWorld = varyingProperty( 'vec3', 'vDeepWorld' );
+		const vCrest = varyingProperty( 'float', 'vDeepCrest' );
+		const uColors = {};
+		const c = ( k ) => uColors[ k ] || ( uColors[ k ] = uniform( PALETTE[ k ] ) );
+
+		mat.positionNode = Fn( () => {
+
+			const step = attribute( 'snapStep', 'vec2' );
+			const p = round( positionGeometry.xz.add( this.uOffset ).div( step ) ).mul( step ).toVar();
+			const w = etheriumWaves( p, this.uWaves, this.uTime, this.uHeight, cameraPosition.xz );
+			const y = w.disp.y.mul( 0.5 ).sub( CLOUD.deep );
+			vWorld.assign( vec3( p.x.add( w.disp.x ), y, p.y.add( w.disp.z ) ) );
+			vCrest.assign( w.disp.y.div( this.uMaxAmp ) );
+			return vec3( p.x.sub( this.uOffset.x ).add( w.disp.x ), y, p.y.sub( this.uOffset.y ).add( w.disp.z ) );
+
+		} )();
+
+		mat.colorNode = Fn( () => {
+
+			const t = this.uTime;
+			const P = vWorld;
+			const tint = mx_noise_float( vec3( P.xz.mul( 0.007 ), t.mul( 0.02 ).add( 3.1 ) ) ).mul( 0.5 ).add( 0.5 ).clamp();
+			const b = billow( P.xz.mul( 0.5 ).add( 40 ), t.mul( 0.5 ), float( 0 ) );
+			const crest = smoothstep( - 0.3, 0.9, vCrest );
+			const base = mix( mix( c( 'cloudShadeA' ), c( 'cloudShadeB' ), tint ), mix( c( 'cloudLitA' ), c( 'cloudLitB' ), tint ).mul( 0.55 ), b.occ );
+			return base.add( mix( c( 'crestA' ), c( 'crestB' ), tint ).mul( crest.mul( crest ) ).mul( 0.3 ) );
 
 		} )();
 

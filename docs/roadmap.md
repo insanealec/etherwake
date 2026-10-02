@@ -243,6 +243,10 @@
   into the sea, parted by the board, thinned with distance (they form the cloud bank on the horizon).
   The haze shells are off by default (`?shells` brings them back; `?noPuffs` hides the puffs). Billows
   are visual only: the board rides the smooth swell and sinks a little into the lumps.
+  Feedback round: the puff bank hid the destination (puffs smaller, fainter, gone by 90 m); the rolling
+  clouds were liked but should be more transparent, so the sea is now see-through near you (`CLOUD.clear`,
+  thin in the creases, dense on lump tops and beyond ~220 m) with a dimmer deep cloud layer
+  `CLOUD.deep` = 9 m below (`buildDeepMaterial`, a child of the sea mesh) to look into.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

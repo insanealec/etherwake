@@ -12,9 +12,9 @@ import { etheriumWaves, cloudColor, PALETTE } from './Etherium.js';
 // cloud layer; their bottoms melt into the sea (soft depth fade) and the board parts them as it passes.
 export const PUFFS = {
 	grid: 64, cell: 5, // 64 x 64 puffs, one per 5 m cell
-	size: 6, sizeRange: 8, // metres across
-	far: 150, // fade-out distance (they thin out well before it, so the far ones don't stack into a wall)
-	opacity: 0.85
+	size: 4, sizeRange: 6, // metres across
+	far: 90, // fade-out distance (they thin out well before it, so the far ones don't stack into a wall)
+	opacity: 0.45
 };
 
 const hash = ( p ) => fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ).mul( 43758.5453 ) );
