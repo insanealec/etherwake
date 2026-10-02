@@ -17,6 +17,7 @@ function mulberry32( a ) {
 
 }
 
+const CULL = 700; // metres: only trails this near the camera bob on the swell each frame
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
@@ -80,7 +81,7 @@ export class Stardust {
 	update( dt, surfer ) {
 
 		this.time += dt;
-		const S = STARDUST, sea = this.sea, p = surfer.position;
+		const S = STARDUST, sea = this.sea, p = surfer.position, cam = sea.mesh.position;
 		let i = 0;
 		this.trails.forEach( ( tr, t ) => {
 
@@ -88,8 +89,18 @@ export class Stardust {
 
 				for ( const m of tr.motes ) m.taken = false;
 				tr.left = S.perTrail;
+				tr.dirty = true;
 
 			}
+
+			// far from the camera: leave them where they were (after the first full pass)
+			if ( this.primed && ! tr.dirty && ( Math.abs( tr.cx - cam.x ) > CULL || Math.abs( tr.cz - cam.z ) > CULL ) ) {
+
+				i += tr.motes.length;
+				return;
+
+			}
+			tr.dirty = false;
 
 			const near = Math.hypot( tr.cx - p.x, tr.cz - p.z ) < S.spacing * S.perTrail;
 			for ( const m of tr.motes ) {
@@ -121,6 +132,7 @@ export class Stardust {
 			this.pillars.setMatrixAt( t, _m.compose( _p, _q.identity(), _s.set( k, k, k ) ) );
 
 		} );
+		this.primed = true;
 		this.motes.instanceMatrix.needsUpdate = true;
 		this.pillars.instanceMatrix.needsUpdate = true;
 

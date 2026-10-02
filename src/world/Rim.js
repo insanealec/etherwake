@@ -136,9 +136,18 @@ export class Rim {
 		const inFront = _v.z < 1 && _v.z > - 1;
 		uLens.value.set( _v.x * 0.5 + 0.5, 0.5 - _v.y * 0.5, Math.abs( _r.x - _v.x ) * 0.5 * camera.aspect, inFront ? 1 : 0 );
 
+		const cam = sea.mesh.position;
 		this.pearls.forEach( ( p, i ) => {
 
-			if ( p.taken && this.time > p.back ) p.taken = false;
+			if ( p.taken && this.time > p.back ) {
+
+				p.taken = false;
+				p.dirty = true;
+
+			}
+			// far from the camera: leave it where it was (after the first full pass)
+			if ( this.primed && ! p.dirty && ( Math.abs( p.x - cam.x ) > 700 || Math.abs( p.z - cam.z ) > 700 ) ) return;
+			p.dirty = false;
 			const y = sea.heightAt( p.x, p.z ) + p.lift + Math.sin( this.time * 1.2 + i ) * 0.4;
 			let k = p.taken ? 0 : 1;
 			if ( ! p.taken && rider && Math.hypot( rider.position.x - p.x, rider.position.z - p.z, rider.position.y + 0.8 - y ) < 3.5 ) {
@@ -153,6 +162,7 @@ export class Rim {
 
 		} );
 		this.pearlMesh.instanceMatrix.needsUpdate = true;
+		this.primed = true;
 
 	}
 

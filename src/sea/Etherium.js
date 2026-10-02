@@ -480,58 +480,87 @@ export class Etherium {
 	}
 
 	// JS twin of etheriumWaves: displacement and normal of the grid point (x, z).
-	sampleGrid( x, z, t, out ) {
+	// mode: 'full' (displacement and normal), 'height' (displacement only), 'shift' (sideways only).
+	// The extra lifts (bow waves, flare-fronts, ring waves) only move the surface up and down, so 'shift'
+	// skips them, and only 'full' pays for their finite-difference slope.
+	sampleGrid( x, z, t, out, mode = 'full' ) {
 
-		const H = SEA.height * swellFactorJS( x, z ), HX = SEA.height, calm = harborCalm( x, z );
+		const calm = harborCalm( x, z );
+		if ( mode === 'shift' ) {
+
+			let dx = 0, dz = 0;
+			for ( const w of this.waves ) {
+
+				const amp = w.s * calm / w.k * Math.cos( w.k * ( w.dx * x + w.dz * z ) - w.omega * t );
+				dx += w.dx * amp; dz += w.dz * amp;
+
+			}
+			out.dx = dx; out.dz = dz;
+			return out;
+
+		}
+
+		const H = SEA.height * swellFactorJS( x, z ), HX = SEA.height, full = mode === 'full';
 		let dx = 0, dy = 0, dz = 0, tx = 1, ty = 0, tz = 0, bx = 0, by = 0, bz = 1;
 		for ( const w of this.waves ) {
 
 			const f = w.k * ( w.dx * x + w.dz * z ) - w.omega * t;
 			const c = Math.cos( f ), sn = Math.sin( f );
 			const s = w.s * calm;
-			const amp = s / w.k, ss = s * sn, sc = s * c * H;
+			const amp = s / w.k;
 			dx += w.dx * amp * c; dy += amp * sn * H; dz += w.dz * amp * c;
-			tx -= w.dx * w.dx * ss; ty += w.dx * sc; tz -= w.dx * w.dz * ss;
-			bx -= w.dx * w.dz * ss; by += w.dz * sc; bz -= w.dz * w.dz * ss;
+			if ( full ) {
+
+				const ss = s * sn, sc = s * c * H;
+				tx -= w.dx * w.dx * ss; ty += w.dx * sc; tz -= w.dx * w.dz * ss;
+				bx -= w.dx * w.dz * ss; by += w.dz * sc; bz -= w.dz * w.dz * ss;
+
+			}
 
 		}
-		// leviathan bow waves: height plus a finite-difference slope (matches etheriumWaves)
-		const bh = extraHeightJS( x, z, t ), e = 0.6;
+		// the extra lifts: height, plus a finite-difference slope for the normal (matches etheriumWaves)
+		const bh = extraHeightJS( x, z, t );
 		dy += bh * HX;
-		ty += ( extraHeightJS( x + e, z, t ) - bh ) / e * HX;
-		by += ( extraHeightJS( x, z + e, t ) - bh ) / e * HX;
 		out.dx = dx; out.dy = dy; out.dz = dz;
-		out.nx = by * tz - bz * ty; out.ny = bz * tx - bx * tz; out.nz = bx * ty - by * tx;
+		if ( full ) {
+
+			const e = 0.6;
+			ty += ( extraHeightJS( x + e, z, t ) - bh ) / e * HX;
+			by += ( extraHeightJS( x, z + e, t ) - bh ) / e * HX;
+			out.nx = by * tz - bz * ty; out.ny = bz * tx - bx * tz; out.nz = bx * ty - by * tx;
+
+		}
 		return out;
 
 	}
 
-	// Gerstner waves move points sideways, so find the grid point that lands on (x, z).
-	_solve( x, z, t ) {
+	// Gerstner waves move points sideways, so find the grid point that lands on (x, z); the refinement
+	// steps only need the sideways shift.
+	_solve( x, z, t, mode ) {
 
 		const s = this._s || ( this._s = {} );
 		let px = x, pz = z;
 		for ( let i = 0; i < 4; i ++ ) {
 
-			this.sampleGrid( px, pz, t, s );
+			this.sampleGrid( px, pz, t, s, 'shift' );
 			px = x - s.dx; pz = z - s.dz;
 
 		}
-		return this.sampleGrid( px, pz, t, s );
+		return this.sampleGrid( px, pz, t, s, mode );
 
 	}
 
 	// Surface height at world (x, z).
 	heightAt( x, z, t = this.time ) {
 
-		return this._solve( x, z, t ).dy;
+		return this._solve( x, z, t, 'height' ).dy;
 
 	}
 
 	// Surface normal at world (x, z).
 	normalAt( x, z, t = this.time, target = new THREE.Vector3() ) {
 
-		const s = this._solve( x, z, t );
+		const s = this._solve( x, z, t, 'full' );
 		return target.set( s.nx, s.ny, s.nz ).normalize();
 
 	}

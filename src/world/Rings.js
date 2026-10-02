@@ -50,6 +50,7 @@ function iceMaterial( glow = 0.5, fog = true ) {
 
 }
 
+const CULL = 700; // metres: only shards and crystals this near the camera bob each frame
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
@@ -118,7 +119,10 @@ export class Rings {
 		const sea = this.sea;
 		this.spire.position.y = sea.heightAt( this.region.x, this.region.z ) - 30;
 
+		const cam = sea.mesh.position, far = ( x, z ) => this.primed && ( Math.abs( x - cam.x ) > CULL || Math.abs( z - cam.z ) > CULL );
 		this.shards.forEach( ( s, i ) => {
+
+			if ( far( s.x, s.z ) ) return; // far from the camera: leave it where it was
 
 			const y = sea.heightAt( s.x, s.z ) - 0.25 * s.scale + Math.sin( this.time * 0.8 + s.phase ) * 0.3;
 			_q.setFromEuler( _e.set( s.tilt, s.yaw + this.time * 0.02, s.tilt * 0.5 ) );
@@ -130,7 +134,14 @@ export class Rings {
 
 		this.crystals.forEach( ( c, i ) => {
 
-			if ( c.taken && this.time > c.back ) c.taken = false;
+			if ( c.taken && this.time > c.back ) {
+
+				c.taken = false;
+				c.dirty = true;
+
+			}
+			if ( far( c.x, c.z ) && ! c.dirty ) return;
+			c.dirty = false;
 			const y = sea.heightAt( c.x, c.z ) + 2;
 			let k = c.taken ? 0 : 1;
 			if ( ! c.taken && rider && Math.hypot( rider.position.x - c.x, rider.position.z - c.z, rider.position.y + 0.8 - y ) < 3 ) {
@@ -146,6 +157,7 @@ export class Rings {
 
 		} );
 		this.crystalMesh.instanceMatrix.needsUpdate = true;
+		this.primed = true;
 
 		if ( rider ) this.collide( rider );
 

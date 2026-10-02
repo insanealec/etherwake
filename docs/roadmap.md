@@ -214,6 +214,17 @@
   Tab opens a round chart (north up, range rings every 2 km, region circles and names, harbour, galleon,
   whale pod, your arrow). `App.places` / `App.updateNavigation`. The objective line moved down to 50 px;
   `Input` swallows Tab's default focus change.
+- **Graphics and performance pass 1 (2026-10-01),** user: hosting later (Cloudflare Pages when ready, like
+  their other site); "graphics aren't as impressive" as Tidewater. Sea: per-pixel ripple normals (two
+  scrolling `mx_noise_vec3` layers, faded by distance), a brightness ripple, a sun sheen and a grazing sky
+  reflection. Post (`src/post/Cinematic.js`): god rays (radial blur of bright pixels toward the sun),
+  +15% saturation, split toning, vignette, light grain; `?noCinematic` to compare. AgX was tried and
+  rejected (washed the nebula colours grey); ACES stays. CPU: `sampleGrid` modes ('shift' for the
+  refinement steps, 'height', 'full'), so height lookups skip the extra lifts and normals (4.5 -> 1.4 us,
+  identical heights), and stardust / shards / crystals / pearls only bob within 700 m of the camera:
+  game logic 5.1 -> 0.85 ms per frame. **Measurement gotcha:** with the Claude window behind others the
+  pane is throttled and `benchmark()` reports ~18 ms regardless of resolution; trust CPU timings
+  (`frame()` with `pipeline.render` stubbed) or ask the user for an fps reading.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -277,8 +288,10 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Milestone 8's remaining polish: a title screen, performance work (LOD / dynamic resolution), and a GitHub
-Pages deploy.
+Graphics pass 2 (the user wants it closer to Tidewater's polish). Candidates, biggest impact first:
+volumetric-looking nebula cloud banks in the sky with aerial perspective; better hero models (board,
+rider, sail; the galleon); bloom and exposure tuning per region; motion feel (speed streaks, camera
+shake on landings). Hosting later (Cloudflare Pages), and a title screen.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
