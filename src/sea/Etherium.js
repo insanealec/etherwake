@@ -231,10 +231,10 @@ export const PALETTE = {
 	crestA: new THREE.Color( 1.00, 0.32, 0.03 ), // gold
 	crestB: new THREE.Color( 1.00, 0.10, 0.16 ), // rose
 	foam: new THREE.Color( 1.00, 0.70, 0.42 ),
-	cloudLitA: new THREE.Color( 0.30, 0.15, 0.50 ), // sunlit billows: lavender
-	cloudLitB: new THREE.Color( 0.48, 0.14, 0.30 ), // and dusky rose
-	cloudShadeA: new THREE.Color( 0.01, 0.04, 0.09 ), // creases: deep teal
-	cloudShadeB: new THREE.Color( 0.04, 0.008, 0.10 ), // and violet
+	cloudLitA: new THREE.Color( 0.04, 0.24, 0.72 ), // sunlit billows: nebula blue
+	cloudLitB: new THREE.Color( 0.20, 0.16, 0.60 ), // and lavender
+	cloudShadeA: new THREE.Color( 0.0, 0.03, 0.15 ), // creases: deep blue
+	cloudShadeB: new THREE.Color( 0.03, 0.015, 0.12 ), // and indigo
 	rim: new THREE.Color( 0.30, 0.10, 0.55 ),
 	sun: new THREE.Color( 1.00, 0.60, 0.30 ),
 	underside: new THREE.Color( 0.08, 0.015, 0.16 ),
