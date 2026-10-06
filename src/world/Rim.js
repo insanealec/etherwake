@@ -58,7 +58,7 @@ export class Rim {
 		ringMat.colorNode = Fn( () => {
 
 			const v = normalize( cameraPosition.sub( positionWorld ) );
-			return vec3( 2.4, 1.3, 0.6 ).mul( pow( max( dot( normalWorld, v ), 0 ).oneMinus(), 5 ) );
+			return vec3( 2.4, 1.3, 0.6 ).mul( pow( dot( normalWorld, v ).clamp().oneMinus(), 5 ) );
 
 		} )();
 		hole.add( new THREE.Mesh( new THREE.SphereGeometry( H.radius * 1.12, 48, 32 ), ringMat ) );

@@ -343,6 +343,14 @@
   QuadMesh) without saving/restoring the renderer's state, so its 512 px viewport could leak into the
   frame. Now it's an `rtt()` node inside the pipeline (RTTNode resets and restores renderer state).
   Rule: render nothing outside the pipeline by hand; use rtt() nodes.
+  The black boxes kept happening (user, Chrome, 60 fps, nvidia): the real cause was NaN pixels, which
+  bloom's blur spreads into big black blocks for a frame. A scan of every stage caught NaN in the volume
+  output once in ~150 frames. Sources: `pow()` with a base a hair below 0 (GPU pow of a negative is
+  NaN): `pow( 1 - dot( N, V ), k )` when dot rounds above 1 (cloudColor's silver lining: the volume's
+  normals face the camera far more often than the mesh's did), and the wake's `pow( sin( uv.x * pi ),
+  2 )` (sin( pi ) is -9e-8). Fixed everywhere (clamp the dot, square by multiplying), and the scene colour
+  is clamped (max 0, min 60000, which also drops NaN on GPUs) before bloom and the god rays.
+  **Rule: never pow() a base that can dip below 0; clamp it first.**
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

@@ -70,7 +70,7 @@ export class GasGiant {
 			const L = this.sunDir;
 			const V = normalize( cameraPosition.sub( positionWorld ) );
 			const lit = smoothstep( - 0.12, 0.4, dot( N, L ) );
-			const rim = pow( max( dot( N, V ), 0 ).oneMinus(), 3 );
+			const rim = pow( dot( N, V ).clamp().oneMinus(), 3 );
 			const haze = C( 1.0, 0.45, 0.25 ).mul( rim ).mul( lit.add( 0.08 ) ).mul( 0.9 );
 			return col.mul( lit.mul( 1.15 ).add( 0.015 ) ).add( haze );
 

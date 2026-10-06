@@ -149,7 +149,7 @@ function whaleMaterial( time, phase ) {
 		const portal = smoothstep( 0.6, 0.66, patch ).mul( smoothstep( - 0.6, 0.2, around ).mul( onBody ).add( fin.mul( 0.8 ) ) );
 		const dir = normalize( positionWorld.sub( cameraPosition ) );
 		const neb = mx_fractal_noise_float( dir.mul( 3.0 ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
-		const cosmos = mix( vec3( 0.3, 0.06, 0.55 ), vec3( 0.03, 0.4, 0.6 ), neb ).mul( pow( neb, 1.5 ).mul( 1.2 ).add( 0.35 ) )
+		const cosmos = mix( vec3( 0.3, 0.06, 0.55 ), vec3( 0.03, 0.4, 0.6 ), neb ).mul( pow( neb.max( 0 ), 1.5 ).mul( 1.2 ).add( 0.35 ) )
 			.add( starLayer( dir, 90, 0.2 ).mul( 3.0 ) ).add( starLayer( dir, 180, 0.3 ).mul( 2.0 ) ).add( starLayer( dir, 380, 0.45 ).mul( 1.2 ) );
 
 		// glowing freckles on the hide
@@ -160,14 +160,14 @@ function whaleMaterial( time, phase ) {
 
 		// flank stripes just below the midline, with pulses running nose to tail
 		const stripe = smoothstep( 0.07, 0.0, abs( around.add( 0.18 ) ) ).mul( onBody ).mul( smoothstep( 0.9, 0.7, along ) ).mul( smoothstep( 0.1, 0.18, along ) );
-		const pulse = pow( sin( along.mul( 18.0 ).sub( time.mul( 2.5 ) ) ).mul( 0.5 ).add( 0.5 ), 3 );
+		const pulse = pow( sin( along.mul( 18.0 ).sub( time.mul( 2.5 ) ) ).mul( 0.5 ).add( 0.5 ).max( 0 ), 3 );
 
 		// gold eyes on each side of the head
 		const side = cos( u.x.mul( Math.PI * 2 ) ).abs();
 		const eye = smoothstep( 0.03, 0.012, length( vec2( along.sub( 0.075 ), around.sub( 0.12 ) ) ) ).mul( smoothstep( 0.85, 0.95, side ) ).mul( onBody );
 
 		// cyan aura at grazing angles, so they read through the fog
-		const rim = pow( max( dot( normalWorld, dir.negate() ), 0 ).oneMinus(), 3 );
+		const rim = pow( dot( normalWorld, dir.negate() ).clamp().oneMinus(), 3 );
 
 		const skin = vec3( 0.5, 0.9, 1.0 ).mul( freckle.mul( 1.2 ) )
 			.add( vec3( 0.2, 0.9, 1.0 ).mul( stripe ).mul( pulse.mul( 1.6 ).add( 0.3 ) ) )

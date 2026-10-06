@@ -33,7 +33,7 @@ export function godRays( scene, sunUV, visible ) {
 		Loop( R.samples, () => {
 
 			uv.subAssign( step );
-			const c = scene.sample( uv ).rgb;
+			const c = scene.sample( uv ).rgb.max( 0 ).min( 60000 ); // a NaN pixel would streak across the screen
 			sum.addAssign( max( c.sub( R.threshold ), 0 ).mul( light ).mul( R.weight ) );
 			light.mulAssign( R.decay );
 

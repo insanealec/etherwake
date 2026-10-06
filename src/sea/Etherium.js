@@ -286,7 +286,7 @@ export function cloudColor( N, L, V, crest, tint, occ, c ) {
 	const col = mix( shade, lit, diffuse.mul( 0.8 ).add( sky.mul( 0.2 ) ) ).mul( occ ).toVar();
 	col.addAssign( hot.mul( crest.mul( crest ) ).mul( CLOUD.glow ).mul( diffuse.mul( 0.6 ).add( 0.4 ) ) );
 	// silver lining: thin edges glow when the sun is behind them
-	const edge = pow( max( dot( N, V ), 0 ).oneMinus(), 3 );
+	const edge = pow( dot( N, V ).clamp().oneMinus(), 3 ); // clamp: a dot a hair over 1 made pow's base negative = NaN
 	col.addAssign( c( 'sun' ).mul( pow( max( dot( V.negate(), L ), 0 ), 4 ) ).mul( edge ).mul( 1.2 ) );
 	return col;
 
@@ -511,7 +511,7 @@ export class Etherium {
 			// regions tint the sea (the Flare Reach runs hotter, the Ring Reach frostier);
 			// a flare-front's face glows like molten gold
 			col.assign( this.regionTint( col ) );
-			col.addAssign( vec3( ...FLARE_TINT.glow ).mul( pow( flareHeight( P.xz ).div( FLARES.height ), 2 ) ).mul( 0.55 ) );
+			col.addAssign( vec3( ...FLARE_TINT.glow ).mul( pow( flareHeight( P.xz ).div( FLARES.height ).max( 0 ), 2 ) ).mul( 0.55 ) );
 
 			// distant cloud tops soften into the haze
 			col.assign( mix( col, this.uFogColor.mul( 2.2 ).add( c( 'rim' ).mul( 0.15 ) ), smoothstep( 150.0, 900.0, dist ).mul( 0.35 ) ) );

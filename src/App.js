@@ -242,7 +242,8 @@ export class App {
 			return vec4( screenUV.sub( d.div( r ).mul( warp ).div( vec2( aspect, 1 ) ).mul( on ) ), r, rs );
 
 		} )();
-		const color = scene.sample( lens.xy );
+		// clamped (max/min also drop a NaN on GPUs): bloom's blur spreads one bad pixel into black blocks
+		const color = scene.sample( lens.xy ).max( 0 ).min( 60000 );
 		// the event horizon stays black: masked after bloom so no glow bleeds across it
 		const horizon = mix( float( 1 ), smoothstep( lens.w.mul( 0.97 ), lens.w.mul( 1.03 ), lens.z ), uLens.w );
 		this.flare = new SunFlare( this.sea.uSunDir );

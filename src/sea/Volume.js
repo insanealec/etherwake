@@ -197,7 +197,7 @@ export class Volume {
 						const col = cloudColor( N, L, rd.negate(), crest, tint, sun.mul( 0.35 ).add( 0.65 ).mul( s.occ.mul( 0.25 ).add( 0.75 ) ), c )
 							.add( c( 'sun' ).mul( sun.mul( phase.sub( 1 ).max( 0 ) ).mul( V.sun ) ) ); // extra glow looking into the light
 						// the region's tint and the distance haze, as on the sea mesh
-						const fogged = mix( sea.regionTint( col ), sea.uFogColor, exp( sea.uFogDensity.mul( tt ).pow( 2 ).negate() ).oneMinus() );
+						const fogged = mix( sea.regionTint( col ), sea.uFogColor, exp( sea.uFogDensity.mul( tt ).mul( sea.uFogDensity.mul( tt ) ).negate() ).oneMinus() );
 						const ext = s.d.mul( V.density ).mul( step ).mul( smoothstep( V.range, V.range * 0.85, tt ) );
 						const a = exp( ext.negate() );
 						S.addAssign( fogged.mul( T ).mul( a.oneMinus() ) );

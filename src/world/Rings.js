@@ -42,7 +42,7 @@ function iceMaterial( glow = 0.5, fog = true ) {
 	mat.emissiveNode = Fn( () => {
 
 		const v = normalize( cameraPosition.sub( positionWorld ) );
-		const rim = pow( max( dot( normalWorld, v ), 0 ).oneMinus(), 2 );
+		const rim = pow( dot( normalWorld, v ).clamp().oneMinus(), 2 );
 		return vec3( 0.1, 0.55, 0.8 ).mul( rim.mul( glow ).add( 0.04 ) );
 
 	} )();
