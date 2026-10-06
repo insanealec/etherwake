@@ -331,6 +331,13 @@
   of the range).
   Third follow-up ("bare from a distance"): the LOD was too aggressive once terracing was fixed. The
   fraying now fades 60..180 m and the full lumps stay until 0.65..0.9 of the range (then the mesh's).
+  Camera "jolt on turning" (user): the volume was composited before TRAA, but its pixels had no motion
+  vectors (the near sea mesh is cut away there, so the background's zero velocity was used): on fast
+  turns TRAA reprojected the clouds as if static, they lagged and snapped back. Now the volume is
+  composited after TRAA (its jitter pattern is fixed per pixel, no temporal shimmer). Galleon sails and
+  wings are opaque so they write depth (the volume drew over them). **Testing gotcha:** with the render
+  loop stopped (manual `frame()` stepping), screenshots can time out and return a stale frame: restart
+  `renderer.setAnimationLoop` before taking the proof screenshot.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
