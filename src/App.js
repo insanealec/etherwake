@@ -15,7 +15,7 @@ import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
-import { Port } from './world/Port.js';
+import { Port, RING_OUT } from './world/Port.js';
 import { Npcs } from './world/Npcs.js';
 import { Walker } from './player/Walker.js';
 import { WalkCamera } from './core/WalkCamera.js';
@@ -41,7 +41,7 @@ import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
 import { UPGRADES, DEEDS, applyUpgrades, tierName } from './game/Gear.js';
-import { SPAWN, OUTPOST, FROSTWATER, HORIZON, REGIONS } from './world/WorldLayout.js';
+import { SPAWN, OUTPOST, FROSTWATER, HORIZON, REGIONS, HARBOR } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
 import { Input } from './core/Input.js';
@@ -247,7 +247,7 @@ export class App {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
 			helm: 'A/D steer · W more sail · S less sail · E leave the helm · F fly · M mute · H tweaks',
-			surf: 'A/D carve · W sail · S brake · Space jump · R reset · F fly · Tab map · M mute · H tweaks'
+			surf: `A/D carve · W sail · S brake · Space jump · R reset · F fly · Tab map${ this.save.data.ownsGalleon ? ' · G galleon' : '' } · M mute · H tweaks`
 		}[ mode ];
 
 	}
@@ -293,6 +293,7 @@ export class App {
 		else {
 
 			if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
+			if ( surf && input.wasPressed( 'KeyG' ) ) this.summonGalleon();
 			if ( this.dialogue.active ) this.surfer.velocity.multiplyScalar( Math.exp( - 2 * dt ) ); // hold still while talking
 			this.surfer.update( dt, surf && ! this.dialogue.active ? {
 				steer: key( 'KeyD' ) - key( 'KeyA' ),
@@ -664,6 +665,51 @@ export class App {
 	}
 
 	// Reaching the galleon for the first time (saved) gets a callout.
+	// G while surfing (once you own her): the galleon heaves to alongside you, parallel to your heading,
+	// at the first spot clear of the harbour, the outposts, the ice spire and the shards
+	summonGalleon() {
+
+		if ( ! this.save.data.ownsGalleon ) return this.toast( 'No ship to call · the shipwright holds her deed' );
+		const s = this.surfer, yaw = s.yaw, p = s.position;
+		const spot = this.galleonSpot( p.x, p.z, yaw );
+		if ( ! spot ) return this.toast( 'No clear water for her here' );
+		this.galleon.moveTo( spot.x, spot.z, yaw );
+		this.saveShipPose();
+		this.toast( 'The galleon heaves to alongside' );
+
+	}
+
+	galleonSpot( px, pz, yaw ) {
+
+		const obstacles = [
+			{ x: HARBOR.x, z: HARBOR.z, r: RING_OUT + 30 },
+			...[ OUTPOST, FROSTWATER, HORIZON ].map( ( o ) => ( { x: o.x, z: o.z, r: 50 } ) ),
+			{ x: REGIONS.rings.x, z: REGIONS.rings.z, r: 70 }, // the ice spire
+			...this.rings.shards.map( ( sh ) => ( { x: sh.x, z: sh.z, r: sh.scale + 4 } ) )
+		];
+		const fx = Math.sin( yaw ), fz = Math.cos( yaw ); // the ship lies along your heading
+		const clear = ( x, z ) => {
+
+			for ( let a = - 20; a <= 26; a += 4 ) { // stern to bowsprit tip, beam ~5 m each side
+
+				const cx = x + fx * a, cz = z + fz * a;
+				for ( const o of obstacles ) if ( Math.hypot( cx - o.x, cz - o.z ) < o.r + 6 ) return false;
+
+			}
+			return true;
+
+		};
+		for ( const d of [ 45, 60, 80, 110, 150 ] ) for ( const ang of [ 1.5708, - 1.5708, 1.1, - 1.1, 2.0, - 2.0, 0, Math.PI ] ) {
+
+			const c = Math.cos( ang ), sn = Math.sin( ang ); // rotate the heading by ang
+			const x = px + ( fx * c + fz * sn ) * d, z = pz + ( fz * c - fx * sn ) * d;
+			if ( clear( x, z ) ) return { x, z };
+
+		}
+		return null;
+
+	}
+
 	spotGalleon() {
 
 		if ( this.save.data.foundGalleon ) return;

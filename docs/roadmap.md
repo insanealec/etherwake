@@ -281,6 +281,10 @@
   exposure, `bloom.strength`, `uSaturation` in the grade). The region sea tint now goes through
   `Etherium.regionTint()`, shared by the sea, its deep layer and the puffs (before, the see-through
   layers stayed violet everywhere). The Flare Reach repaints the clouds molten amber (`recolor: 0.8`).
+- **Summon the galleon (2026-10-06).** G while surfing, once you own her: `App.summonGalleon()` moves her
+  (`Galleon.moveTo`) alongside you, parallel to your heading, at the first spot (45..150 m, beside you
+  first, then ahead or behind) whose whole hull line clears the harbour ring, the outposts, the ice spire
+  and every ice shard (`galleonSpot`); the pose is saved. The surf hint shows "G galleon" when owned.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

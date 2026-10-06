@@ -603,6 +603,17 @@ export class Galleon {
 	}
 
 	// where she lies, for saving
+	// move her to (x, z), bow toward yaw, stopped, settled on the swell (summoned with G)
+	moveTo( x, z, yaw ) {
+
+		this.group.position.x = x;
+		this.group.position.z = z;
+		this.group.rotation.y = yaw;
+		this.velocity.set( 0, 0, 0 );
+		this.float( 0, true );
+
+	}
+
 	get pose() {
 
 		const p = this.group.position;
