@@ -83,6 +83,24 @@ function hullGeometry() {
 
 }
 
+// a flat panel filling the hull's cross-section at the stern (t = 1), in the xy plane
+function transomGeometry() {
+
+	const M = 18, w = halfWidth( 1 ), d = keel( 1 ), s = sheer( 1 ), pts = [];
+	for ( let j = 0; j <= M; j ++ ) {
+
+		const f = j / M * Math.PI, down = Math.pow( Math.sin( f ), 0.7 );
+		pts.push( new THREE.Vector2( Math.cos( f ) * w * ( 1 - 0.12 * down ), s + 1.3 - d * down ) );
+
+	}
+	const geo = new THREE.ShapeGeometry( new THREE.Shape( pts ) );
+	// uv.y as on the hull (1 at the rail, 0 at the keel), so the planks, wale and copper line up
+	const pos = geo.attributes.position, uv = geo.attributes.uv;
+	for ( let i = 0; i < uv.count; i ++ ) uv.setXY( i, 1, 1 - ( s + 1.3 - pos.getY( i ) ) / d );
+	return geo;
+
+}
+
 function deckGeometry() {
 
 	const pts = [];
@@ -266,13 +284,17 @@ export class Galleon {
 		const g = this.group;
 		const hull = new THREE.Mesh( hullGeometry(), wood );
 		g.add( hull );
+		// the transom: closes the stern, following the hull's last cross-section
+		const transom = new THREE.Mesh( transomGeometry(), wood );
+		transom.position.z = - HALF;
+		g.add( transom );
 		const deck = new THREE.Mesh( deckGeometry(), deckWood );
 		deck.position.y = DECK;
 		g.add( deck );
 
 		// stern castle with a row of lit windows across the back
-		const castle = new THREE.Mesh( new THREE.BoxGeometry( 7.2, 2.8, 8 ), wood );
-		castle.position.set( 0, 1.8, - HALF + 5 );
+		const castle = new THREE.Mesh( new THREE.BoxGeometry( 7.2, 2.8, 9 ), wood ); // flush with the transom
+		castle.position.set( 0, 1.8, - HALF + 4.5 );
 		g.add( castle );
 		this.solid = [ hull, castle ];
 		this.sailMeshes = [];
@@ -298,7 +320,7 @@ export class Galleon {
 		for ( let i = 0; i < 4; i ++ ) {
 
 			const win = new THREE.Mesh( new THREE.PlaneGeometry( 0.9, 0.7 ), windowGlow );
-			win.position.set( - 2.4 + i * 1.6, 2.0, - HALF + 0.98 );
+			win.position.set( - 2.4 + i * 1.6, 2.0, - HALF - 0.02 );
 			win.rotation.y = Math.PI;
 			g.add( win );
 
@@ -471,19 +493,19 @@ export class Galleon {
 
 		// stern gallery (a balcony under the windows) and a cornice round the castle roof
 		const rail = new THREE.Mesh( new THREE.CylinderGeometry( 0.06, 0.06, 7.4, 8 ).rotateZ( Math.PI / 2 ), brass );
-		rail.position.set( 0, 2.4, - HALF + 0.15 );
+		rail.position.set( 0, 2.4, - HALF - 0.85 );
 		const floor = new THREE.Mesh( new THREE.BoxGeometry( 7.4, 0.12, 0.9 ), brass );
-		floor.position.set( 0, 1.55, - HALF + 0.55 );
+		floor.position.set( 0, 1.55, - HALF - 0.45 );
 		g.add( rail, floor );
 		for ( let i = 0; i <= 8; i ++ ) {
 
 			const post = new THREE.Mesh( new THREE.CylinderGeometry( 0.04, 0.04, 0.8, 6 ), brass );
-			post.position.set( - 3.6 + i * 0.9, 2.0, - HALF + 0.15 );
+			post.position.set( - 3.6 + i * 0.9, 2.0, - HALF - 0.85 );
 			g.add( post );
 
 		}
-		const cornice = new THREE.Mesh( new THREE.BoxGeometry( 7.7, 0.22, 8.5 ), brass );
-		cornice.position.set( 0, 3.25, - HALF + 5 );
+		const cornice = new THREE.Mesh( new THREE.BoxGeometry( 7.7, 0.22, 9.5 ), brass );
+		cornice.position.set( 0, 3.25, - HALF + 4.5 );
 		g.add( cornice );
 
 		// a long pennant streaming from the mainmast head
