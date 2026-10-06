@@ -351,6 +351,13 @@
   2 )` (sin( pi ) is -9e-8). Fixed everywhere (clamp the dot, square by multiplying), and the scene colour
   is clamped (max 0, min 60000, which also drops NaN on GPUs) before bloom and the god rays.
   **Rule: never pow() a base that can dip below 0; clamp it first.**
+- **Graphics pass 3, slice 3: shadows in the clouds (2026-10-06).** Analytic casters in `Volume.js`
+  (`VOLUME.rider` spheres round the board, `VOLUME.hull` and `VOLUME.shipSails` ellipsoids in ship
+  coordinates via `uShipInv`, the sails weighted by `sailShown`): each cloud sample tests its ray toward
+  the sun against them (soft shadow by closest approach) and darkens by distance (contact darkening);
+  both multiply the sample's whole colour (`VOLUME.shadow` 0.6, `VOLUME.contact` 0.45). The low sun
+  throws long shadows: the rider's streaks ahead, the galleon's sails lay a wide band across the sea.
+  Not done: GTAO on the ship and port (needs a normal MRT), shadows on the far mesh.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -424,7 +431,7 @@ TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
    from the swell height plus 3D noise, a few light steps toward the sun for self-shadowing, emission in
    the palette), at reduced resolution with blue-noise jitter and temporal accumulation, composited by
    depth. Replaces the see-through layers and the puffs; the board and the ship carve channels in it.
-3. **Shadows and AO:** the rider, board and galleon shadow the clouds (shadow map read in the volume and
+3. ✅ (clouds; GTAO on the ship and port still to do) **Shadows and AO:** the rider, board and galleon shadow the clouds (shadow map read in the volume and
    the sea shader); GTAO on the ship and port.
 4. **Volumetric sky nebulae** and light shafts through the cloud volume.
 5. **Motion blur** (from the velocity MRT) and auto exposure.

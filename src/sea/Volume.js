@@ -42,7 +42,16 @@ export const VOLUME = {
 	drift: [ 0.9, 0.12, 0.25 ], // m/s, the billows' slow flow
 	forward: 0.55, // forward scattering (silver lining) strength
 	tunnel: 2.6, // radius of the clear view from the camera to the board (m)
-	resolution: 1 // of the screen
+	resolution: 1, // of the screen
+	// shadow casters (graphics pass 3, slice 3): simple shapes standing in for the rider and the galleon,
+	// tested along each sample's ray toward the sun (soft shadows on the cloud tops) and by distance
+	// (contact darkening in the gas round them). Rider spheres: [ offset from the board, radius ]; ship
+	// ellipsoids in ship coordinates: [ centre, semi-axes ] (the sails only when they're let out)
+	rider: [ [ [ 0, 0.3, 0 ], 1.0 ], [ [ 0, 1.3, 0 ], 0.55 ], [ [ 0, 1.9, 0 ], 0.9 ] ],
+	hull: [ [ 0, - 0.5, 0 ], [ 4.6, 3.8, 18.5 ] ],
+	shipSails: [ [ [ 0, 13.5, 6.4 ], [ 5.2, 5, 0.9 ] ], [ [ 0, 15.5, - 2.6 ], [ 6.2, 6, 0.9 ] ] ],
+	shadow: 0.6, // how dark a full shadow is (1: black)
+	contact: 0.45 // how dark the gas right against a caster is
 };
 
 const DEBUG = new URLSearchParams( location.search ).get( 'volDebug' ); // '' (noise), 'n' (normals), 't' (hit distance / 60 m)
@@ -59,6 +68,9 @@ export class Volume {
 		const cameraWorldMatrix = uniform( camera.matrixWorld );
 		const cameraProjectionMatrixInverse = uniform( camera.projectionMatrixInverse );
 		this.uBoard = uniform( new THREE.Vector3( 0, - 1000, 0 ) );
+		this.uRiderOn = uniform( 0 );
+		this.uShipInv = uniform( new THREE.Matrix4() ); // world -> ship coordinates
+		this.uShipSail = uniform( 0 );
 		this.uFrame = uniform( 0 );
 		const noise = cloudNoiseTexture( 64 );
 		const t = sea.uTime;
@@ -99,6 +111,47 @@ export class Volume {
 			const tunnel = length( p.sub( cameraPosition.add( ab.mul( along ) ) ) );
 			const carve = smoothstep( 0.8, 2.0, length( p.sub( this.uBoard ) ) ).mul( smoothstep( V.tunnel * 0.4, V.tunnel, tunnel ) );
 			return { d: max( body, puff ).mul( carve ), surf, h, occ: hs.b, above, edge, near };
+
+		};
+
+		// soft shadow of a sphere (centre c, radius r) on point p, toward the sun, and its contact darkening
+		const sphere = ( p, c, r ) => {
+
+			const toC = c.sub( p );
+			const along = toC.dot( L );
+			const miss = length( toC.sub( L.mul( along.max( 0 ) ) ) );
+			const shadow = along.greaterThan( 0 ).select( smoothstep( r * 0.5, r * 1.4, miss ), float( 1 ) );
+			return { shadow, contact: smoothstep( r * 0.9, r * 2.2, length( toC ) ) };
+
+		};
+		// the same for an ellipsoid in ship coordinates (scaled to a unit sphere)
+		const ellipsoid = ( pl, Ll, centre, axes ) => {
+
+			const a = vec3( ...axes );
+			const q = pl.sub( vec3( ...centre ) ).div( a ), d = Ll.div( a );
+			const along = q.negate().dot( d ).div( d.dot( d ) );
+			const miss = length( q.add( d.mul( along.max( 0 ) ) ) );
+			const shadow = along.greaterThan( 0 ).select( smoothstep( 0.6, 1.3, miss ), float( 1 ) );
+			return { shadow, contact: smoothstep( 1.0, 1.6, length( q ) ) };
+
+		};
+		// all casters at once: { shadow, contact } multipliers for the sunlight and the gas colour
+		const casters = ( p ) => {
+
+			let shadow = float( 1 ), contact = float( 1 );
+			for ( const [ off, r ] of V.rider ) {
+
+				const sp = sphere( p, this.uBoard.add( vec3( ...off ) ), r );
+				shadow = shadow.mul( mix( float( 1 ), sp.shadow, this.uRiderOn ) );
+				contact = contact.mul( mix( float( 1 ), sp.contact, this.uRiderOn ) );
+
+			}
+			const pl = this.uShipInv.mul( vec4( p, 1 ) ).xyz, Ll = this.uShipInv.mul( vec4( L, 0 ) ).xyz;
+			const hull = ellipsoid( pl, Ll, ...V.hull );
+			shadow = shadow.mul( hull.shadow );
+			contact = contact.mul( hull.contact );
+			for ( const [ centre, axes ] of V.shipSails ) shadow = shadow.mul( mix( float( 1 ), ellipsoid( pl, Ll, centre, axes ).shadow, this.uShipSail ) );
+			return { shadow: shadow.oneMinus().mul( V.shadow ).oneMinus(), contact: contact.oneMinus().mul( V.contact ).oneMinus() };
 
 		};
 
@@ -176,7 +229,7 @@ export class Volume {
 						// self-shadowing: how much sunlight gets through the gas toward the sun (with a softer
 						// multiple-scattering share, so shadowed folds aren't black)
 						const k = V.density * V.lightDensity;
-						const sun = exp( od.mul( - k ) ).mul( 0.7 ).add( exp( od.mul( - k * 0.25 ) ).mul( 0.3 ) );
+						const sun = exp( od.mul( - k ) ).mul( 0.7 ).add( exp( od.mul( - k * 0.25 ) ).mul( 0.3 ) ).toVar();
 						// the billow's surface normal from the density gradient: shaded like the sea mesh
 						// (cloudColor), so near volume and far mesh match
 						const e = V.normalStep;
@@ -192,10 +245,12 @@ export class Volume {
 							hitT.assign( tt );
 
 						} );
+						const cast = casters( p );
 						const tint = smoothstep( 0.3, 0.7, texture3D( noise, p.div( 420 ) ).level( 0 ).r ); // broad colour drift
 						const crest = smoothstep( - 0.3, 0.75, s.surf.div( sea.uMaxAmp ) );
 						const col = cloudColor( N, L, rd.negate(), crest, tint, sun.mul( 0.35 ).add( 0.65 ).mul( s.occ.mul( 0.25 ).add( 0.75 ) ), c )
-							.add( c( 'sun' ).mul( sun.mul( phase.sub( 1 ).max( 0 ) ).mul( V.sun ) ) ); // extra glow looking into the light
+							.add( c( 'sun' ).mul( sun.mul( phase.sub( 1 ).max( 0 ) ).mul( V.sun ) ) ) // extra glow looking into the light
+							.mul( cast.shadow ).mul( cast.contact ); // cast shadows and contact darkening dim the whole colour
 						// the region's tint and the distance haze, as on the sea mesh
 						const fogged = mix( sea.regionTint( col ), sea.uFogColor, exp( sea.uFogDensity.mul( tt ).mul( sea.uFogDensity.mul( tt ) ).negate() ).oneMinus() );
 						const ext = s.d.mul( V.density ).mul( step ).mul( smoothstep( V.range, V.range * 0.85, tt ) );
@@ -237,7 +292,16 @@ export class Volume {
 
 	}
 
-	update( surfer, camera ) {
+	update( surfer, camera, galleon ) {
+
+		this.uRiderOn.value = surfer ? 1 : 0;
+		if ( galleon ) {
+
+			this.uShipInv.value.copy( galleon.group.matrixWorld ).invert();
+			this.uShipSail.value = galleon.sailShown ?? 0;
+
+		}
+
 
 		// the jitter pattern stays put: the volume is composited after TRAA, so a moving pattern would shimmer
 		this.uFrame.value = 0;

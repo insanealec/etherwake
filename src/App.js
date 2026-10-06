@@ -433,7 +433,7 @@ export class App {
 		if ( this.volume ) {
 
 			this.seaHeight.update( this.camera );
-			this.volume.update( this.onFoot ? null : this.surfer, this.camera );
+			this.volume.update( this.onFoot ? null : this.surfer, this.camera, this.galleon );
 
 		}
 		this.pipeline.render();
