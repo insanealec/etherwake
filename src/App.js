@@ -13,6 +13,7 @@ import { Puffs } from './sea/Puffs.js';
 import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
+import { Title, TITLE } from './ui/Title.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
 import { Port, RING_OUT } from './world/Port.js';
@@ -165,6 +166,7 @@ export class App {
 		this.atDropoff = ( p ) => Math.hypot( p.x - dockmaster.buoy.position.x, p.z - dockmaster.buoy.position.z ) < 7;
 		this.save.onChange( ( d ) => this.showCredits( d.credits ) );
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
+		if ( ! this.params.has( 'noTitle' ) && ! this.params.has( 'fly' ) ) this.title = new Title( this.save.data, () => this.chase.snap( this.surfer ) );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
 
@@ -176,6 +178,7 @@ export class App {
 
 		this.save.useSlot( 'test' );
 		this.audio.disableForSession();
+		this.title?.close();
 		return 'test mode: save slot "test", audio off';
 
 	}
@@ -279,6 +282,7 @@ export class App {
 		this.clock.update( time );
 		const dt = Math.max( 0, Math.min( this.clock.getDelta(), 0.1 ) );
 		const input = this.input;
+		if ( this.title?.open ) input.keys.clear(), input.pressed.clear(); // nothing steers while the title is up
 
 		if ( input.wasPressed( 'KeyF' ) ) this.setMode( this.mode === 'fly' ? this.returnMode : 'fly' );
 
@@ -376,6 +380,7 @@ export class App {
 		for ( const m of this.motes ) m.update( this.camera, this.surfer );
 		if ( this.shells ) this.shells.update();
 		if ( this.puffs ) this.puffs.update( this.camera, this.surfer );
+		if ( this.title?.open ) this.titleOrbit();
 		this.updateHud();
 		this.updateObjective();
 		if ( input.wasPressed( 'Tab' ) ) this.seaMap.toggle();
@@ -665,6 +670,17 @@ export class App {
 	}
 
 	// Reaching the galleon for the first time (saved) gets a callout.
+	// while the title is up the camera circles slowly round the harbour, looking out over the sea
+	titleOrbit() {
+
+		const O = TITLE.orbit, a = this.time * O.speed;
+		const cx = SPAWN.x - 20, cz = SPAWN.z;
+		const x = cx + Math.cos( a ) * O.radius, z = cz + Math.sin( a ) * O.radius;
+		this.camera.position.set( x, this.sea.heightAt( x, z ) + O.height, z );
+		this.camera.lookAt( cx + Math.cos( a + 1.2 ) * O.radius * 2, O.lookUp, cz + Math.sin( a + 1.2 ) * O.radius * 2 );
+
+	}
+
 	// G while surfing (once you own her): the galleon heaves to alongside you, parallel to your heading,
 	// at the first spot clear of the harbour, the outposts, the ice spire and the shards
 	summonGalleon() {

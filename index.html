@@ -31,6 +31,16 @@
 		#seamap { position: fixed; left: 50%; top: 50%; transform: translate( -50%, -50% ) scale( .96 ); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 		#seamap.open { opacity: 1; transform: translate( -50%, -50% ) scale( 1 ); }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
+		#title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 16px; background: radial-gradient( ellipse at 50% 45%, rgba( 10, 4, 24, .15 ), rgba( 5, 3, 13, .7 ) ); cursor: pointer; transition: opacity .9s; z-index: 10; }
+		#title.closing { opacity: 0; pointer-events: none; }
+		#title .name { font-size: clamp( 52px, 11vw, 120px ); letter-spacing: .08em; color: #ffd08a; text-shadow: 0 0 24px #ff7a3a, 0 0 60px rgba( 255, 120, 60, .5 ), 0 3px 4px #000; animation: breathe 6s ease-in-out infinite; }
+		#title .tag { margin-top: 4px; font-size: clamp( 15px, 2.4vw, 21px ); font-style: italic; letter-spacing: .06em; color: #bff4ee; text-shadow: 0 0 10px #1a8f8a, 0 1px 2px #000; }
+		#title .go { margin-top: 46px; font-size: 20px; letter-spacing: .1em; color: #f3e6c4; text-shadow: 0 1px 3px #000; animation: blink 2.4s ease-in-out infinite; }
+		#title .voyage { margin-top: 12px; font-size: 15px; color: #ffcf8a; text-shadow: 0 1px 2px #000; }
+		#title .keys { position: absolute; bottom: 22px; left: 16px; right: 16px; font-size: 13px; color: rgba( 243, 230, 196, .7 ); text-shadow: 0 1px 2px #000; }
+		@keyframes breathe { 50% { text-shadow: 0 0 34px #ff9a4a, 0 0 90px rgba( 255, 140, 70, .65 ), 0 3px 4px #000; } }
+		@keyframes blink { 50% { opacity: .45; } }
+		body.on-title #hud, body.on-title #compass, body.on-title #credits, body.on-title #objective, body.on-title #prompt, body.on-title #toast { visibility: hidden; }
 	</style>
 </head>
 <body>

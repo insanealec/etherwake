@@ -289,6 +289,11 @@
   `game/Gear.js`: the galleon's thrust, dragQuad and turnRate scale by the board's ratio to its starter
   numbers (sail canvas, hull polish, grip rails). Full canvas, 60 s run: 26 m/s base, 32 with tier I of
   each, 43 fully upgraded; turning up to 1.35x. Shop blurbs mention it.
+- **Title screen (2026-10-06).** `ui/Title.js` (+ `#title` CSS in `index.html`): the name over the live
+  scene while App circles the camera round the harbour (`TITLE.orbit`, `App.titleOrbit`), "set sail" or
+  "continue your voyage" with credits and the galleon, the controls. Input is ignored while it's up;
+  any trusted click or key closes it (the same gesture starts the audio). The HUD hides under
+  `body.on-title`. Skipped with `?noTitle` / `?fly`, and closed by `__ew.testMode()`.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -353,7 +358,9 @@
 
 ## Next up
 Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky, the
-surfer hero model, figures, galleon dressing, motion feel, per-region look. Next: a title screen. Hosting later (Cloudflare Pages), only when the user asks.
+surfer hero model, figures, galleon dressing, motion feel, per-region look, title screen. Next: ask the
+user (candidates: a settings panel with volume and graphics quality on the title, more jobs/content per
+region, sound pass with CC0 samples). Hosting later (Cloudflare Pages), only when the user asks.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
