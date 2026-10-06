@@ -258,7 +258,8 @@ export const CLOUD = {
 	deep: 9 // metres: a dimmer cloud layer below, seen through the top one
 };
 // billow noise: |noise| has rounded tops and creased valleys, like the lumps on a cumulus
-const lumps = ( q, t, seed ) => mx_noise_float( vec3( q, t.mul( 0.04 ).add( seed ) ) ).abs().mul( 1.6 ).clamp();
+// (smoothstep, not a clamp: a clamp flattened the lumps into plateaus with hard rims)
+const lumps = ( q, t, seed ) => smoothstep( 0.0, 0.7, mx_noise_float( vec3( q, t.mul( 0.04 ).add( seed ) ) ).abs() );
 
 // TSL: billow height (metres) and crease occlusion at xz. fine: 0..1 weight of the small octave.
 export function billow( xz, t, fine ) {

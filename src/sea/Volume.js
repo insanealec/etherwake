@@ -34,7 +34,8 @@ export const VOLUME = {
 	relief: 2, // normal tilt exaggeration
 	fringe: 1.6, // metres the 3D noise lifts or cuts the cloud top
 	erode: 0.9, // metres of finer fraying
-	edge: 0.35, // half-thickness of the cloud top's soft edge (m)
+	edge: 0.35, // half-thickness of the cloud top's soft edge (m), 2.5x that far away
+	detailNear: 25, detailFar: 90, // metres: full 3D fraying within detailNear, none beyond detailFar
 	puffs: 0.6, // loose puffs' density (0: none)
 	puffScale: 30, puffHeight: 3.5, // loose puffs above the tops: noise tile (m), how high they drift
 	density: 4, // extinction per metre at full density (high: cloud tops with crisp silhouettes)
@@ -76,9 +77,13 @@ export class Volume {
 			const base = texture3D( noise, p.sub( flow ).div( V.baseScale ) ).level( 0 ).r;
 			const detail = texture3D( noise, p.sub( flow.mul( 1.6 ) ).div( V.detailScale ) ).level( 0 ).g;
 			// 3D noise frays the top: overhangs and wisps the heightfield can't make
-			const top = surf.add( hs.g.mul( V.lumps ) ).add( base.sub( 0.55 ).mul( V.fringe ) );
-			const above = p.y.sub( top ).add( detail.sub( 0.5 ).mul( V.erode ) );
-			const body = smoothstep( V.edge, V.edge * - 1, above );
+			// level of detail: the fine fraying fades with distance (far away it's finer than a pixel and
+			// turns to blotches), and the edge softens, so the far volume matches the smooth mesh lumps
+			const near = smoothstep( V.detailFar, V.detailNear, length( p.sub( cameraPosition ) ) );
+			const top = surf.add( hs.g.mul( V.lumps ) ).add( base.sub( 0.55 ).mul( V.fringe ).mul( near ) );
+			const above = p.y.sub( top ).add( detail.sub( 0.5 ).mul( V.erode ).mul( near ) );
+			const edge = near.oneMinus().mul( V.edge * 1.5 ).add( V.edge );
+			const body = smoothstep( edge, edge.negate(), above );
 			// now and then a loose puff drifts above the tops
 			const puff = smoothstep( 0.72, 0.86, texture3D( noise, p.sub( flow.mul( 0.7 ) ).div( V.puffScale ).add( 0.37 ) ).level( 0 ).r )
 				.mul( smoothstep( V.puffHeight, 0.5, above ) ).mul( smoothstep( - 0.5, 0.8, above ) ).mul( V.puffs )
@@ -89,7 +94,7 @@ export class Volume {
 			const along = p.sub( cameraPosition ).dot( ab ).div( ab.dot( ab ).max( 1e-3 ) ).clamp();
 			const tunnel = length( p.sub( cameraPosition.add( ab.mul( along ) ) ) );
 			const carve = smoothstep( 0.8, 2.0, length( p.sub( this.uBoard ) ) ).mul( smoothstep( V.tunnel * 0.4, V.tunnel, tunnel ) );
-			return { d: max( body, puff ).mul( carve ), surf, h, occ: hs.b };
+			return { d: max( body, puff ).mul( carve ), surf, h, occ: hs.b, above, edge, near };
 
 		};
 
@@ -135,14 +140,20 @@ export class Volume {
 					} );
 					const p = ro.add( rd.mul( tt ) );
 					const s = densityAt( p );
-					// fine steps near the camera, coarser with distance
+					// surface-aware steps: above the cloud top, step by the distance to it (it can't be reached
+					// sooner, even where it rises ahead at V.maxSlope), so rays slow down as they arrive and
+					// sample the soft edge finely: fixed steps landed on the top at step-sized intervals and
+					// terraced it. Near the puffs' height the steps stay modest so puffs aren't skipped.
 					const step = max( tt.mul( V.stepGrowth ), V.minStep ).toVar();
-					// above the billows: skip down toward them (the band's top is V.top above the swell)
-					const gap = s.h.sub( V.top + 0.3 );
-					If( gap.greaterThan( 0 ), () => {
+					const safe = s.above.sub( s.edge ).mul( 0.9 ).div( max( rd.y.negate(), 0 ).add( V.maxSlope ) );
+					If( s.above.greaterThan( s.edge ), () => {
 
-						// safe distance: the ray can't meet gas sooner, even if the swell rises ahead (slope <= V.maxSlope)
-						step.assign( max( step, gap.mul( 0.9 ).div( max( rd.y.negate(), 0 ).add( V.maxSlope ) ) ) );
+						const cap = s.above.lessThan( V.puffHeight + 1 ).select( max( step, 1.5 ), float( 1e4 ) );
+						step.assign( min( max( safe, V.minStep ), cap ) );
+
+					} ).Else( () => {
+
+						step.assign( min( step, s.edge.mul( 0.5 ).max( V.minStep ) ) );
 
 					} );
 					If( s.d.greaterThan( 0.003 ), () => {
@@ -166,7 +177,8 @@ export class Volume {
 						const gx = densityAt( p.add( vec3( e, 0, 0 ) ) ).d.sub( s.d );
 						const gy = densityAt( p.add( vec3( 0, e, 0 ) ) ).d.sub( s.d );
 						const gz = densityAt( p.add( vec3( 0, 0, e ) ) ).d.sub( s.d );
-						const grad = vec3( gx.mul( V.relief ), gy, gz.mul( V.relief ) ); // tilted harder, as the mesh's bumps are
+						const relief = s.near.mul( V.relief - 1 ).add( 1 ); // tilted harder up close (as the mesh's bumps are), true far away
+						const grad = vec3( gx.mul( relief ), gy, gz.mul( relief ) );
 						const N = length( grad ).greaterThan( 1e-4 ).select( normalize( grad.negate() ), vec3( 0, 1, 0 ) );
 						If( hitT.lessThan( 0 ).and( s.d.greaterThan( 0.5 ) ), () => {
 

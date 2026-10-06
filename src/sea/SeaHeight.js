@@ -18,7 +18,8 @@ export class SeaHeight {
 		this.sea = sea;
 		this.texel = size / res;
 		this.uCenter = uniform( new THREE.Vector2() );
-		this.target = new THREE.RenderTarget( res, res, { type: THREE.HalfFloatType, depthBuffer: false } );
+		// full float: half floats at +100 m snap heights to ~6 cm steps, which terrace the cloud tops
+		this.target = new THREE.RenderTarget( res, res, { type: THREE.FloatType, depthBuffer: false } );
 		this.target.texture.minFilter = this.target.texture.magFilter = THREE.LinearFilter;
 
 		const mat = new THREE.MeshBasicNodeMaterial( { fog: false } );

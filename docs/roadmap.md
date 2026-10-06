@@ -316,6 +316,13 @@
   `cameraProjectionMatrixInverse` are the quad's camera: bind the game camera's matrices as uniforms.
   Cost: ~3.3-3.5 ms/frame at 651x700 with or without it on this GPU. Debug views: `?volDebug`, `=n`,
   `=t`, `=e`, `=d` (see Volume.js). Hidden-pane testing: rAF stops, so step `__ew.frame( t )`.
+  Follow-up (user: "looks really bad in the air / from a distance", not TAA): (1) the cloud tops were
+  terraced: fixed ray steps landed on the top at step-sized intervals. Now steps are surface-aware
+  (distance to the cloud top over the ray's descent plus a 0.7 max slope; fine steps inside the soft
+  edge). (2) `lumps()` in Etherium clamped |noise| into flat plateaus with hard rims (shared by the mesh):
+  now a smoothstep. (3) Distance LOD: the 3D fraying fades 25..90 m, the edge softens and the normal
+  exaggeration goes away with distance. (4) The height texture is 32-bit float (half floats at +100 m
+  snap to ~6 cm). ~3.7-3.9 ms/frame at 651x700.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
