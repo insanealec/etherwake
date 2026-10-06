@@ -268,8 +268,9 @@ export class Galleon {
 		// lights and sails ignore the fog, so the ship glows through the haze from the harbour
 		const glow = new THREE.MeshBasicNodeMaterial( { color: new THREE.Color( 4.0, 2.2, 0.8 ), fog: false } );
 		const windowGlow = new THREE.MeshBasicNodeMaterial( { color: new THREE.Color( 2.4, 1.2, 0.4 ) } );
-		// solar sails: saturated gold, glowing brightest in the middle, with brass ribs; see-through
-		const sail = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, transparent: true, depthWrite: false, opacity: 0.85, fog: false } );
+		// solar sails: saturated gold, glowing brightest in the middle, with brass ribs. Opaque, so they
+		// write depth: the volumetric etherium stops at them instead of drawing the gas behind on top
+		const sail = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, fog: false } );
 		this.uSailGlow = uniform( 0 );
 		sail.colorNode = Fn( () => {
 
