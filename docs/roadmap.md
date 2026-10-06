@@ -329,6 +329,8 @@
   Now SeaHeight's alpha holds the big lumps alone; the volume blends to exactly those beyond its detail
   range, the mesh keeps its lumps out to 300..450 m, and the dithered hand-off is narrower (0.85..0.95
   of the range).
+  Third follow-up ("bare from a distance"): the LOD was too aggressive once terracing was fixed. The
+  fraying now fades 60..180 m and the full lumps stay until 0.65..0.9 of the range (then the mesh's).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

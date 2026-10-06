@@ -35,7 +35,7 @@ export const VOLUME = {
 	fringe: 1.6, // metres the 3D noise lifts or cuts the cloud top
 	erode: 0.9, // metres of finer fraying
 	edge: 0.35, // half-thickness of the cloud top's soft edge (m), 2.5x that far away
-	detailNear: 25, detailFar: 90, // metres: full 3D fraying within detailNear, none beyond detailFar
+	detailNear: 60, detailFar: 180, // metres: full 3D fraying within detailNear, none beyond detailFar
 	puffs: 0.6, // loose puffs' density (0: none)
 	puffScale: 30, puffHeight: 3.5, // loose puffs above the tops: noise tile (m), how high they drift
 	density: 4, // extinction per metre at full density (high: cloud tops with crisp silhouettes)
@@ -79,10 +79,12 @@ export class Volume {
 			// 3D noise frays the top: overhangs and wisps the heightfield can't make
 			// level of detail: the fine fraying fades with distance (far away it's finer than a pixel and
 			// turns to blotches), and the edge softens, so the far volume matches the smooth mesh lumps
-			const near = smoothstep( V.detailFar, V.detailNear, length( p.sub( cameraPosition ) ) );
+			const dist = length( p.sub( cameraPosition ) );
+			const near = smoothstep( V.detailFar, V.detailNear, dist );
+			const full = smoothstep( V.range * 0.9, V.range * 0.65, dist ); // the full lumps until the hand-off
 			// up close both lump sizes, taller; further out just the big lumps, exactly the sea mesh's geometry,
 			// so where the mesh takes over the shapes match
-			const top = surf.add( mix( hs.a, hs.g.mul( V.lumps ), near ) ).add( base.sub( 0.55 ).mul( V.fringe ).mul( near ) );
+			const top = surf.add( mix( hs.a, hs.g.mul( V.lumps ), full ) ).add( base.sub( 0.55 ).mul( V.fringe ).mul( near ) );
 			const above = p.y.sub( top ).add( detail.sub( 0.5 ).mul( V.erode ).mul( near ) );
 			const edge = near.oneMinus().mul( V.edge * 1.5 ).add( V.edge );
 			const body = smoothstep( edge, edge.negate(), above );
