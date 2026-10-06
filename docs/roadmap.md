@@ -365,6 +365,16 @@
   Beams and shadow shafts stream between the crests; the rider casts a shadow shaft. Full-density
   probes cost 33 ms/frame at 1920x953; the heightfield probes ~3.5-3.9 ms total. Strength 0.12 (1.2
   whited out the view into the sun).
+- **Graphics pass 3, slice 5: auto exposure (2026-10-06).** `post/Exposure.js`: every 6 frames, right
+  after the frame, a 32x18 log-luminance thumbnail of the scene texture is rendered (state saved and
+  restored with `RendererUtils`) and read back asynchronously; the factor eases (1.5/s) toward
+  (0.11 / average)^0.5 within 0.7..1.35 and multiplies the region look's exposure. Away from the sun the
+  open sea averages ~0.07..0.12 (factor ~1); into the sun ~0.27 (factor -> 0.7). `?noAutoExposure`.
+  Gotchas met: an rtt() only reachable through a dummy `x * 0` term in the output rendered once and
+  froze; sampling an rtt node from another material cloned it (stale copy): sample `texture( node.value )`
+  instead; material outputs clamp negatives (store log luminance + 10); and with the pane hidden, GPU
+  readbacks of manually stepped frames are stale: verify readback-driven features with the pane visible
+  (a screenshot makes it visible).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -441,7 +451,8 @@ TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
 3. ✅ (clouds; GTAO on the ship and port still to do) **Shadows and AO:** the rider, board and galleon shadow the clouds (shadow map read in the volume and
    the sea shader); GTAO on the ship and port.
 4. ✅ (light shafts; the sky nebulae stay the 2D cliffs for now) **Volumetric sky nebulae** and light shafts through the cloud volume.
-5. **Motion blur** (from the velocity MRT) and auto exposure.
+5. ✅ (auto exposure; motion blur skipped: the user is sensitive to camera disorientation, and the speed
+   lines carry the speed) **Motion blur** (from the velocity MRT) and auto exposure.
 6. **Hero materials:** CC0 PBR textures (Poly Haven / ambientCG) for wood, brass and canvas.
 Each slice: measure the frame cost (ms) before and after, keep a URL flag to turn it off.
 

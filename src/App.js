@@ -15,6 +15,7 @@ import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Title, TITLE } from './ui/Title.js';
+import { AutoExposure } from './post/Exposure.js';
 import { SeaHeight } from './sea/SeaHeight.js';
 import { Volume, VOLUME } from './sea/Volume.js';
 import { Surfer } from './player/Surfer.js';
@@ -248,6 +249,7 @@ export class App {
 		const horizon = mix( float( 1 ), smoothstep( lens.w.mul( 0.97 ), lens.w.mul( 1.03 ), lens.z ), uLens.w );
 		this.flare = new SunFlare( this.sea.uSunDir );
 		let out = color.add( this.flare.node );
+		if ( ! this.params.has( 'noAutoExposure' ) ) this.exposure = new AutoExposure( scene );
 		if ( ! this.params.has( 'noBloom' ) ) {
 
 			this.bloom = bloom( color, 0.55, 0.45, 0.85 );
@@ -382,7 +384,7 @@ export class App {
 		this.spotPod();
 		this.onRegion( this.regions.update( dt, this.camera.position, this.onFoot ? null : this.surfer.position ) );
 		const look = this.regions.look;
-		this.renderer.toneMappingExposure = look.exposure;
+		this.renderer.toneMappingExposure = look.exposure * ( this.exposure ? this.exposure.update( dt ) : 1 );
 		if ( this.bloom ) this.bloom.strength.value = look.bloom;
 		uSaturation.value = look.saturation;
 		this.spotGalleon();
@@ -437,6 +439,7 @@ export class App {
 
 		}
 		this.pipeline.render();
+		this.exposure?.measure( this.renderer );
 
 	}
 
