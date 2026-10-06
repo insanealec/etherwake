@@ -294,6 +294,11 @@
   "continue your voyage" with credits and the galleon, the controls. Input is ignored while it's up;
   any trusted click or key closes it (the same gesture starts the audio). The HUD hides under
   `body.on-title`. Skipped with `?noTitle` / `?fly`, and closed by `__ew.testMode()`.
+- **Graphics pass 3, slice 1: temporal AA (2026-10-06).** The scene pass writes an MRT (`output`,
+  `velocity`); `traa()` (three/addons TRAANode) jitters the camera and blends the reprojected history;
+  its texture feeds the lens warp, bloom and god rays as before. MSAA is off (TRAA needs it off);
+  `?noTAA` restores MSAA. Cost: a wash, ~3.3 ms/frame at 651x700 either way (`__ew.benchmarkFrame()`,
+  which now waits for the GPU each frame; a queued batch returned before the work was done).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -361,7 +366,7 @@
 it can look, Tidewater-level; the foundation is in place, now upgrade). three 0.186 ships most of the
 tools as TSL nodes in `three/addons/tsl/display/` (TRAANode, TAAUNode, GTAONode, MotionBlur,
 TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
-1. **Temporal foundation:** a velocity MRT on the scene pass and TRAA (temporal AA). Kills shimmer on
+1. ✅ **Temporal foundation:** a velocity MRT on the scene pass and TRAA (temporal AA). Kills shimmer on
    rigging, rails and cloud edges; later slices accumulate over frames on top of it.
 2. **The hero: a volumetric etherium.** Raymarch the cloud sea as real 3D gas near the camera (density
    from the swell height plus 3D noise, a few light steps toward the sun for self-shadowing, emission in

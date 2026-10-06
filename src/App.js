@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, pass, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
+import { Fn, uniform, pass, mrt, output, velocity, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { Starfield } from './sky/Starfield.js';
 import { Etherium, bowHeightAt, flareHeightAt } from './sea/Etherium.js';
 import { GasGiant } from './sky/GasGiant.js';
@@ -69,7 +70,8 @@ export class App {
 
 		} );
 
-		this.renderer = new THREE.WebGPURenderer( { antialias: true } );
+		// temporal AA (TRAA, in buildPipeline) replaces MSAA; ?noTAA brings MSAA back
+		this.renderer = new THREE.WebGPURenderer( { antialias: this.params.has( 'noTAA' ) } );
 		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
 		// ACES keeps the nebula colours vivid (AgX washed them grey); ?noCinematic turns off the
@@ -188,7 +190,17 @@ export class App {
 
 		this.pipeline = new THREE.RenderPipeline( this.renderer );
 		this.uSpeedFx = uniform( 0 ); // 0..1 from the board's speed: speed lines (see MOTION.speed)
-		const scene = pass( this.scene, this.camera ).getTextureNode( 'output' );
+		const scenePass = pass( this.scene, this.camera );
+		let scene = scenePass.getTextureNode( 'output' );
+		// temporal AA: the camera jitters a sub-pixel each frame and TRAA blends the history, reprojected
+		// by per-pixel velocity (graphics pass 3, slice 1). Later slices accumulate over frames on top of it.
+		if ( ! this.params.has( 'noTAA' ) ) {
+
+			scenePass.setMRT( mrt( { output, velocity } ) );
+			this.traa = traa( scene, scenePass.getTextureNode( 'depth' ), scenePass.getTextureNode( 'velocity' ), this.camera );
+			scene = this.traa.getTextureNode();
+
+		}
 		// gravitational lensing around the Rim's black hole: pixels near it sample the scene closer to
 		// its centre (so what's behind is magnified outward into an Einstein ring), and the horizon is black
 		const lens = Fn( () => {
@@ -986,6 +998,29 @@ export class App {
 		const ms = ( performance.now() - t0 ) / n;
 		this.renderer.setRenderTarget( null );
 		rt.dispose();
+		return ms;
+
+	}
+
+	// The whole frame's GPU cost (scene pass plus post) at the window's size: ms per pipeline.render().
+	// Compare with URL flags (?noTAA, ...) to price a feature. __ew.benchmarkFrame()
+	async benchmarkFrame( n = 40 ) {
+
+		// each frame waits for the GPU (a queued batch returns before the work is done); stop the loop first
+		const device = this.renderer.backend.device;
+		this.renderer.setAnimationLoop( null );
+		this.pipeline.render();
+		await device.queue.onSubmittedWorkDone();
+		const t0 = performance.now();
+		for ( let i = 0; i < n; i ++ ) {
+
+			this.sea.update( this.time += 1 / 60, this.camera );
+			this.pipeline.render();
+			await device.queue.onSubmittedWorkDone();
+
+		}
+		const ms = ( performance.now() - t0 ) / n;
+		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
 		return ms;
 
 	}
