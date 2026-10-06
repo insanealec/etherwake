@@ -11,8 +11,8 @@ import { cloudNoiseTexture } from './CloudNoise.js';
 // thick cloud, and a band above it is billowy cumulus carved from tileable Perlin-Worley noise
 // (CloudNoise.js) and frayed by finer detail. Each sample takes a few steps toward the sun for
 // self-shadowing (bright tops, shaded folds, a silver lining against the light), plus sky light from
-// above and the crest colours glowing from inside. Rendered at reduced resolution with a jittered start
-// (TRAA in App blends the jitter away), stopped by the scene's depth (the board, ships and port), and
+// above and the crest colours glowing from inside. A jittered start (a fixed per-pixel pattern: it's
+// composited after TRAA), stopped by the scene's depth (the board, ships and port), and
 // faded out by VOLUME.range, where the sea mesh takes over. ?noVolume turns it off. Debug views:
 // ?volDebug (raw noise r/g, density 30 m out in b), =n (first-hit normals), =t (hit distance / 60 m),
 // =e (ray start, end and where the march stopped, / 220 m), =d (scene depth, view z and distance / 220 m).
@@ -128,7 +128,7 @@ export class Volume {
 			const T = float( 1 ).toVar(); // transmittance
 			If( t1.greaterThan( t0 ), () => {
 
-				// jittered start (interleaved gradient noise, new each frame): TRAA averages the banding away
+				// jittered start (interleaved gradient noise, a fixed per-pixel pattern) hides step banding
 				const ign = fract( fract( dot( screenCoordinate.xy.add( this.uFrame.mul( 5.588238 ) ), vec2( 0.06711056, 0.00583715 ) ) ).mul( 52.9829189 ) );
 				const tt = t0.add( max( t0.mul( V.stepGrowth ), V.minStep ).mul( ign ) ).toVar();
 				const cosTheta = dot( rd, L );
@@ -239,7 +239,8 @@ export class Volume {
 
 	update( surfer, camera ) {
 
-		this.uFrame.value = ( this.uFrame.value + 1 ) % 64;
+		// the jitter pattern stays put: the volume is composited after TRAA, so a moving pattern would shimmer
+		this.uFrame.value = 0;
 		// with no board (on foot) the tunnel collapses onto the camera
 		if ( surfer ) this.uBoard.value.copy( surfer.position );
 		else this.uBoard.value.copy( camera.position );

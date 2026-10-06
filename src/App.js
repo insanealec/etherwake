@@ -195,8 +195,19 @@ export class App {
 		this.uSpeedFx = uniform( 0 ); // 0..1 from the board's speed: speed lines (see MOTION.speed)
 		const scenePass = pass( this.scene, this.camera );
 		let scene = scenePass.getTextureNode( 'output' );
-		// the volumetric etherium: raymarched near the camera, composited over the scene before TRAA so
-		// its jittered samples get averaged (graphics pass 3, slice 2); ?noVolume keeps the mesh-only sea
+		// temporal AA: the camera jitters a sub-pixel each frame and TRAA blends the history, reprojected
+		// by per-pixel velocity (graphics pass 3, slice 1)
+		if ( ! this.params.has( 'noTAA' ) ) {
+
+			scenePass.setMRT( mrt( { output, velocity } ) );
+			this.traa = traa( scene, scenePass.getTextureNode( 'depth' ), scenePass.getTextureNode( 'velocity' ), this.camera );
+			scene = this.traa.getTextureNode();
+
+		}
+		// the volumetric etherium: raymarched near the camera and composited over the scene *after* TRAA.
+		// (Before it, the cloud pixels had no motion vectors, the near sea mesh being cut away there, so
+		// TRAA reprojected them as if static: on a fast turn the clouds lagged a frame and snapped back.)
+		// ?noVolume keeps the mesh-only sea (graphics pass 3, slice 2)
 		if ( ! this.params.has( 'noVolume' ) ) {
 
 			this.seaHeight = new SeaHeight( this.sea );
@@ -204,18 +215,9 @@ export class App {
 			this.sea.useVolume( VOLUME.range );
 			this.cameraClearance = VOLUME.cameraClear; // look down onto the cloud tops, not through them
 			if ( this.puffs ) this.puffs.mesh.visible = false;
-			// a texture of its own, sized up front: TRAA reads its size before an auto-sized one is ready
+			// a texture of its own (the lens warp, bloom and god rays below sample it)
 			scene = this.beauty = rtt( this.volume.composite( scene ) );
 			this.sizeBeauty();
-
-		}
-		// temporal AA: the camera jitters a sub-pixel each frame and TRAA blends the history, reprojected
-		// by per-pixel velocity (graphics pass 3, slice 1). Later slices accumulate over frames on top of it.
-		if ( ! this.params.has( 'noTAA' ) ) {
-
-			scenePass.setMRT( mrt( { output, velocity } ) );
-			this.traa = traa( scene, scenePass.getTextureNode( 'depth' ), scenePass.getTextureNode( 'velocity' ), this.camera );
-			scene = this.traa.getTextureNode();
 
 		}
 		// gravitational lensing around the Rim's black hole: pixels near it sample the scene closer to
