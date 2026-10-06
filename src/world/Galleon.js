@@ -4,6 +4,7 @@ import { GALLEON, HARBOR } from './WorldLayout.js';
 import { RING_OUT } from './Port.js';
 import { sailPower } from './Wind.js';
 import { buildFigure } from '../player/Figure.js';
+import { boardRatio } from '../game/Gear.js';
 
 // The solar galleon (milestone 7), procedural first pass in a Treasure Planet-like spirit (our own
 // design): a wooden hull with a rising sheer and brass trim, a stern castle with lit windows, a
@@ -561,14 +562,16 @@ export class Galleon {
 
 		const S = SHIP, g = this.group, v = this.velocity;
 		const speed = this.speed;
+		// the board's sail, hull and rail upgrades carry over (see SHIP_FROM_BOARD in game/Gear.js)
+		const thrust = S.thrust * boardRatio( 'thrust' ), dragQuad = S.dragQuad * boardRatio( 'dragQuad' ), turnRate = S.turnRate * boardRatio( 'turnRate' );
 		this.wheel += ( steer - this.wheel ) * ( 1 - Math.exp( - 4 * dt ) );
 		this.wheelMesh.rotation.z = - this.wheel * 2.5;
-		g.rotation.y -= this.wheel * S.turnRate * Math.min( 1, 0.15 + speed / S.turnSpeed ) * dt;
+		g.rotation.y -= this.wheel * turnRate * Math.min( 1, 0.15 + speed / S.turnSpeed ) * dt;
 
 		const fx = Math.sin( g.rotation.y ), fz = Math.cos( g.rotation.y );
 		const eff = sailPower( g.rotation.y, this.sailState ).efficiency;
 		this.solarOnly = eff < S.solar;
-		const push = S.thrust * Math.max( S.solar, eff ) * this.sail;
+		const push = thrust * Math.max( S.solar, eff ) * this.sail;
 		const n = this.sea.normalAt( g.position.x, g.position.z );
 		v.x += ( fx * push + n.x * 12 * S.slope ) * dt;
 		v.z += ( fz * push + n.z * 12 * S.slope ) * dt;
@@ -577,7 +580,7 @@ export class Galleon {
 		const fwd = v.x * fx + v.z * fz;
 		const keep = Math.exp( - S.keel * dt );
 		const latX = ( v.x - fx * fwd ) * keep, latZ = ( v.z - fz * fwd ) * keep;
-		const fwd2 = fwd * Math.max( 0, 1 - ( S.drag + S.dragQuad * Math.abs( fwd ) ) * dt );
+		const fwd2 = fwd * Math.max( 0, 1 - ( S.drag + dragQuad * Math.abs( fwd ) ) * dt );
 		v.x = fx * fwd2 + latX;
 		v.z = fz * fwd2 + latZ;
 		g.position.x += v.x * dt;

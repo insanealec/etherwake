@@ -285,6 +285,10 @@
   (`Galleon.moveTo`) alongside you, parallel to your heading, at the first spot (45..150 m, beside you
   first, then ahead or behind) whose whole hull line clears the harbour ring, the outposts, the ice spire
   and every ice shard (`galleonSpot`); the pose is saved. The surf hint shows "G galleon" when owned.
+- **Galleon shares the board upgrades (2026-10-06).** `SHIP_FROM_BOARD` / `boardRatio()` in
+  `game/Gear.js`: the galleon's thrust, dragQuad and turnRate scale by the board's ratio to its starter
+  numbers (sail canvas, hull polish, grip rails). Full canvas, 60 s run: 26 m/s base, 32 with tier I of
+  each, 43 fully upgraded; turning up to 1.35x. Shop blurbs mention it.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

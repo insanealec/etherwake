@@ -29,10 +29,15 @@ export const BOARD = {
 // The starter board's numbers, kept so upgrades can be re-applied from scratch.
 export const BASE_BOARD = { ...BOARD };
 
+// The galleon shares the shipwright's work: her push, drag and rudder (SHIP in world/Galleon.js) scale by
+// the same ratio as the board's numbers of the same name, so she keeps pace as the board gets better.
+export const SHIP_FROM_BOARD = [ 'thrust', 'dragQuad', 'turnRate' ];
+export const boardRatio = ( key ) => BOARD[ key ] / BASE_BOARD[ key ];
+
 // The shipwright's upgrades: each line has tiers; buying tier n sets the listed BOARD numbers.
 export const UPGRADES = [
 	{
-		id: 'sail', name: 'Sail canvas', blurb: 'more push from the solar wind',
+		id: 'sail', name: 'Sail canvas', blurb: 'more push from the solar wind (board and galleon)',
 		tiers: [
 			{ cost: 80, set: { thrust: 7.2 } },
 			{ cost: 200, set: { thrust: 8.6 } },
@@ -40,7 +45,7 @@ export const UPGRADES = [
 		]
 	},
 	{
-		id: 'hull', name: 'Hull polish', blurb: 'less drag, higher top speed',
+		id: 'hull', name: 'Hull polish', blurb: 'less drag, higher top speed (board and galleon)',
 		tiers: [
 			{ cost: 100, set: { dragQuad: 0.0105 } },
 			{ cost: 250, set: { dragQuad: 0.009 } },
@@ -48,7 +53,7 @@ export const UPGRADES = [
 		]
 	},
 	{
-		id: 'rails', name: 'Grip rails', blurb: 'carve harder, slip less',
+		id: 'rails', name: 'Grip rails', blurb: 'carve harder, slip less (the galleon turns quicker too)',
 		tiers: [
 			{ cost: 60, set: { grip: 8.5, turnRate: 1.9 } },
 			{ cost: 150, set: { grip: 10, turnRate: 2.1 } },
