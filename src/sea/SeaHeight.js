@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, vec2, vec4, uv, texture } from 'three/tsl';
+import { Fn, uniform, vec2, vec4, uv, rtt } from 'three/tsl';
 import { etheriumWaves, billow } from './Etherium.js';
 
 // The sea's height as a texture around the camera, re-rendered every frame: the swell (Gerstner waves
@@ -19,12 +19,7 @@ export class SeaHeight {
 		this.sea = sea;
 		this.texel = size / res;
 		this.uCenter = uniform( new THREE.Vector2() );
-		// full float: half floats at +100 m snap heights to ~6 cm steps, which terrace the cloud tops
-		this.target = new THREE.RenderTarget( res, res, { type: THREE.FloatType, depthBuffer: false } );
-		this.target.texture.minFilter = this.target.texture.magFilter = THREE.LinearFilter;
-
-		const mat = new THREE.MeshBasicNodeMaterial( { fog: false } );
-		mat.colorNode = Fn( () => {
+		const heights = Fn( () => {
 
 			const xz = this.uCenter.add( uv().sub( 0.5 ).mul( size ) ).toVar();
 			// the waves move points sideways too: two fixed-point steps find the grid point that lands here
@@ -41,20 +36,19 @@ export class SeaHeight {
 			return vec4( w.disp.y.add( SEA_HEIGHT.offset ), b.h, b.occ, billow( xz, sea.uTime, 0 ).h );
 
 		} )();
-		this.quad = new THREE.QuadMesh( mat );
-		this.tex = texture( this.target.texture );
+		// rendered by the post pipeline as a render-to-texture node (it saves and restores the renderer's
+		// state: rendering it by hand before the pipeline leaked a 512 px viewport into the frame now and
+		// then = black boxes on screen). Full float: half floats at +100 m snap heights to ~6 cm steps,
+		// which terraced the cloud tops.
+		this.tex = rtt( heights, res, res, { type: THREE.FloatType, depthBuffer: false } );
 
 	}
 
-	// re-render around the camera (snapped to whole texels so it doesn't shimmer)
-	update( renderer, camera ) {
+	// follow the camera (snapped to whole texels so it doesn't shimmer); the pipeline re-renders it
+	update( camera ) {
 
 		const t = this.texel;
 		this.uCenter.value.set( Math.round( camera.position.x / t ) * t, Math.round( camera.position.z / t ) * t );
-		const prev = renderer.getRenderTarget();
-		renderer.setRenderTarget( this.target );
-		this.quad.render( renderer );
-		renderer.setRenderTarget( prev );
 
 	}
 

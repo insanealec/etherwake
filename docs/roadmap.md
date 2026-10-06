@@ -338,6 +338,11 @@
   wings are opaque so they write depth (the volume drew over them). **Testing gotcha:** with the render
   loop stopped (manual `frame()` stepping), screenshots can time out and return a stale frame: restart
   `renderer.setAnimationLoop` before taking the proof screenshot.
+  Black boxes on screen for a frame (user, at 1920x953; the left 655 px = 512 x a 1.28 display scale
+  drawn, the rest black): SeaHeight was rendered by hand before the pipeline (setRenderTarget + a
+  QuadMesh) without saving/restoring the renderer's state, so its 512 px viewport could leak into the
+  frame. Now it's an `rtt()` node inside the pipeline (RTTNode resets and restores renderer state).
+  Rule: render nothing outside the pipeline by hand; use rtt() nodes.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

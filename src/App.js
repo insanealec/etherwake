@@ -419,7 +419,7 @@ export class App {
 		input.endFrame();
 		if ( this.volume ) {
 
-			this.seaHeight.update( this.renderer, this.camera );
+			this.seaHeight.update( this.camera );
 			this.volume.update( this.onFoot ? null : this.surfer, this.camera );
 
 		}
@@ -1040,7 +1040,7 @@ export class App {
 		for ( let i = 0; i < n; i ++ ) {
 
 			this.sea.update( this.time += 1 / 60, this.camera );
-			this.seaHeight?.update( this.renderer, this.camera );
+			this.seaHeight?.update( this.camera );
 			this.pipeline.render();
 			await device.queue.onSubmittedWorkDone();
 
