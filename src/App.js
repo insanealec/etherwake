@@ -102,6 +102,17 @@ export class App {
 		await this.renderer.init();
 		this.backend = this.renderer.backend.isWebGPUBackend ? 'webgpu' : 'webgl2';
 		console.info( `[etherwake] renderer backend: ${ this.backend }` );
+		const gpu = this.renderer.backend.device?.adapterInfo || this.renderer.backend.adapter?.info;
+		if ( gpu ) console.info( `[etherwake] GPU: ${ gpu.vendor } ${ gpu.architecture } ${ gpu.description || '' }` );
+		// ?stats: frame rate, the slowest frame of the last second, the GPU and the canvas size
+		if ( this.params.has( 'stats' ) ) {
+
+			this.statsEl = document.createElement( 'div' );
+			this.statsEl.style.cssText = 'position:fixed;left:12px;top:12px;font:12px monospace;color:#bff4ee;text-shadow:0 1px 2px #000;pointer-events:none;z-index:20';
+			document.body.appendChild( this.statsEl );
+			this.stats = { frames: 0, worst: 0, since: performance.now(), last: performance.now(), gpu: gpu ? `${ gpu.vendor } ${ gpu.architecture }` : '?' };
+
+		}
 
 		this.sea = new Etherium( this.scene );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
@@ -310,6 +321,7 @@ export class App {
 
 	frame( time ) {
 
+		if ( this.stats ) this.updateStats();
 		this.clock.update( time );
 		const dt = Math.max( 0, Math.min( this.clock.getDelta(), 0.1 ) );
 		const input = this.input;
@@ -1048,6 +1060,21 @@ export class App {
 		const ms = ( performance.now() - t0 ) / n;
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
 		return ms;
+
+	}
+
+	updateStats() {
+
+		const S = this.stats, now = performance.now();
+		S.frames ++;
+		S.worst = Math.max( S.worst, now - S.last );
+		S.last = now;
+		if ( now - S.since < 1000 ) return;
+		const c = this.renderer.domElement;
+		this.statsEl.textContent = `${ Math.round( S.frames * 1000 / ( now - S.since ) ) } fps · worst ${ S.worst.toFixed( 0 ) } ms · ${ c.width }x${ c.height } @${ devicePixelRatio } · ${ S.gpu }`;
+		S.frames = 0;
+		S.worst = 0;
+		S.since = now;
 
 	}
 
