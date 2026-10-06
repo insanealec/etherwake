@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import {
 	Fn, uniform, float, vec2, vec3, sin, cos, dot, length, normalize, cross, max, pow, smoothstep, mix, select,
 	positionGeometry, attribute, round, cameraPosition, frontFacing, varyingProperty, fog, densityFogFactor,
-	mx_fractal_noise_float, mx_noise_float
+	mx_fractal_noise_float, mx_noise_float, If, Discard, screenCoordinate, fract
 } from 'three/tsl';
 import { SEA, WAVES } from './Waves.js';
 import { HARBOR, REGIONS } from '../world/WorldLayout.js';
@@ -367,6 +367,7 @@ export class Etherium {
 		this.uFogDensity = uniform( FOG.above );
 		this.uUnderwater = uniform( 0 );
 		this.uFlareMix = uniform( 0 ); // region atmosphere: 0 in the open sea, 1 inside a region
+		this.uVolumeRange = uniform( 0 ); // > 0 when the volumetric etherium owns the near sea (useVolume)
 		this.uRegionSea = uniform( new THREE.Color( ...FLARE_TINT.sea ) ); // the region's sea tint
 		this.uRegionRecolor = uniform( 0 ); // 0: multiply the sea's colours; 1: repaint them in the tint (keeping brightness)
 		this.regionMix = 0;
@@ -475,6 +476,17 @@ export class Etherium {
 			const V = normalize( cameraPosition.sub( P ) );
 			const L = this.uSunDir;
 			const dist = length( cameraPosition.sub( P ) );
+			// the volumetric etherium draws the near sea: hand over through a dithered band (TRAA smooths it)
+			If( this.uVolumeRange.greaterThan( 0 ), () => {
+
+				const dither = fract( fract( dot( screenCoordinate.xy, vec2( 0.06711056, 0.00583715 ) ) ).mul( 52.9829189 ) );
+				If( dist.lessThan( this.uVolumeRange.mul( dither.mul( 0.15 ).add( 0.65 ) ) ), () => {
+
+					Discard();
+
+				} );
+
+			} );
 
 			// cloud tops: per-pixel billow bumps on top of the swell (finite-difference slope of both octaves)
 			const fine = smoothstep( 160.0, 40.0, dist ); // the small lumps fade out with distance
@@ -520,6 +532,19 @@ export class Etherium {
 		} )();
 
 		return mat;
+
+	}
+
+	// the volumetric etherium (sea/Volume.js) takes over the near sea: the mesh turns opaque, drops its
+	// near part (see the colour shader) and the deep layer goes
+	useVolume( range ) {
+
+		this.uVolumeRange.value = range;
+		const m = this.mesh.material;
+		m.transparent = false;
+		m.opacityNode = null;
+		m.needsUpdate = true;
+		this.deep.visible = false;
 
 	}
 

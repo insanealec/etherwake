@@ -299,6 +299,23 @@
   its texture feeds the lens warp, bloom and god rays as before. MSAA is off (TRAA needs it off);
   `?noTAA` restores MSAA. Cost: a wash, ~3.3 ms/frame at 651x700 either way (`__ew.benchmarkFrame()`,
   which now waits for the GPU each frame; a queued batch returned before the work was done).
+- **Graphics pass 3, slice 2 (in progress, opt-in `?volume`).** `sea/SeaHeight.js`: the swell's height
+  (fixed-point solved, plus all the lifts) rendered each frame into a 512 m / 512 px half-float texture
+  round the camera; checked against `heightAt` (8.53 vs 8.60 m). `sea/CloudNoise.js`: tileable 64^3
+  Perlin-Worley (R) and Worley fbm (G), generated at startup. `sea/Volume.js`: half-res raymarch (rtt),
+  composited over the scene *before* TRAA (the composite gets its own explicitly sized rtt: TRAA reads
+  its size before an auto-sized one is ready, which gave a 1x1 history = a flat screen). Density: solid
+  below the swell, a 3 m billow band above it (base noise remapped by height coverage, eroded by detail),
+  a clear tunnel from the camera to the board; steps grow with distance (4.5%), empty space above the
+  band is skipped; 3 sun-shadow samples; shading = Etherium's `cloudColor` with a normal from the density
+  gradient, darkened by the sun shadow. The sea mesh drops its near part through a dithered band
+  (`Etherium.useVolume`); the chase camera rides 4.8 m above the swell so it looks down onto the tops.
+  Status: has volumetric form (rounded masses, lit rims, the board sunk in the gas) but is still softer
+  than the mesh sea, the 4 m billows don't read yet, and the hand-off to the mesh at ~150 m shows a seam.
+  Next: crisper billows (higher-frequency base, full-res or depth-aware upsampling, less TRAA smear),
+  match the mesh's brightness at the seam (or shade the far mesh from the same terms), then make it the
+  default. Debug: `?volDebug` (raw noise r/g, density 30 m out in b). Hidden-pane testing: rAF stops, so
+  step `__ew.frame( t )` manually.
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

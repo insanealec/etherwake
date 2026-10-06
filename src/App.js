@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, pass, mrt, output, velocity, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
+import { Fn, uniform, pass, mrt, output, velocity, rtt, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { Starfield } from './sky/Starfield.js';
@@ -15,6 +15,8 @@ import { TweakPanel } from './ui/TweakPanel.js';
 import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Title, TITLE } from './ui/Title.js';
+import { SeaHeight } from './sea/SeaHeight.js';
+import { Volume, VOLUME } from './sea/Volume.js';
 import { Surfer } from './player/Surfer.js';
 import { Wake } from './player/Wake.js';
 import { Port, RING_OUT } from './world/Port.js';
@@ -74,6 +76,7 @@ export class App {
 		this.renderer = new THREE.WebGPURenderer( { antialias: this.params.has( 'noTAA' ) } );
 		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
+		this.sizeBeauty();
 		// ACES keeps the nebula colours vivid (AgX washed them grey); ?noCinematic turns off the
 		// cinematic post (god rays, grade) for comparison
 		this.cinematic = ! this.params.has( 'noCinematic' );
@@ -116,7 +119,7 @@ export class App {
 		this.surfer.reset( SPAWN.x, SPAWN.z, SPAWN.yaw );
 		this.wake = new Wake( this.scene, this.sea );
 		this.spray = new Spray( this.scene );
-		this.chase = new ChaseCamera( this.camera, this.sea );
+		this.chase = new ChaseCamera( this.camera, this.sea, this.cameraClearance ? { clearance: this.cameraClearance } : {} );
 		this.surfer.onLand = ( r ) => this.onLand( r );
 		this.chase.snap( this.surfer );
 		this.walker = new Walker( this.scene );
@@ -192,6 +195,21 @@ export class App {
 		this.uSpeedFx = uniform( 0 ); // 0..1 from the board's speed: speed lines (see MOTION.speed)
 		const scenePass = pass( this.scene, this.camera );
 		let scene = scenePass.getTextureNode( 'output' );
+		// the volumetric etherium: raymarched near the camera, composited over the scene before TRAA so
+		// its jittered samples get averaged (graphics pass 3, slice 2). Opt-in with ?volume while it's
+		// being tuned (it isn't yet better than the mesh sea)
+		if ( this.params.has( 'volume' ) ) {
+
+			this.seaHeight = new SeaHeight( this.sea );
+			this.volume = new Volume( this.sea, this.seaHeight, scenePass.getTextureNode( 'depth' ) );
+			this.sea.useVolume( VOLUME.range );
+			this.cameraClearance = VOLUME.cameraClear; // look down onto the cloud tops, not through them
+			if ( this.puffs ) this.puffs.mesh.visible = false;
+			// a texture of its own, sized up front: TRAA reads its size before an auto-sized one is ready
+			scene = this.beauty = rtt( this.volume.composite( scene ) );
+			this.sizeBeauty();
+
+		}
 		// temporal AA: the camera jitters a sub-pixel each frame and TRAA blends the history, reprojected
 		// by per-pixel velocity (graphics pass 3, slice 1). Later slices accumulate over frames on top of it.
 		if ( ! this.params.has( 'noTAA' ) ) {
@@ -398,6 +416,12 @@ export class App {
 		if ( input.wasPressed( 'Tab' ) ) this.seaMap.toggle();
 		this.updateNavigation();
 		input.endFrame();
+		if ( this.volume ) {
+
+			this.seaHeight.update( this.renderer, this.camera );
+			this.volume.update( this.onFoot ? null : this.surfer, this.camera );
+
+		}
 		this.pipeline.render();
 
 	}
@@ -1015,6 +1039,7 @@ export class App {
 		for ( let i = 0; i < n; i ++ ) {
 
 			this.sea.update( this.time += 1 / 60, this.camera );
+			this.seaHeight?.update( this.renderer, this.camera );
 			this.pipeline.render();
 			await device.queue.onSubmittedWorkDone();
 
@@ -1022,6 +1047,14 @@ export class App {
 		const ms = ( performance.now() - t0 ) / n;
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
 		return ms;
+
+	}
+
+	sizeBeauty() {
+
+		if ( ! this.beauty ) return;
+		const s = this.renderer.getDrawingBufferSize( new THREE.Vector2() );
+		this.beauty.setSize( s.x, s.y );
 
 	}
 
