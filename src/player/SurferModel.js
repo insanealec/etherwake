@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { Fn, vec3, sin, uv, time, positionLocal, smoothstep, fract, mix, color } from 'three/tsl';
+import { Fn, vec2, vec3, sin, uv, time, positionLocal, smoothstep, fract, mix, color, texture, normalMap } from 'three/tsl';
+import { ASSETS } from '../world/Assets.js';
 
 // The solar surfer's hero model, built from shaped primitives (no assets):
 // - the board: a shaped hull (pointed nose, squared tail, bevelled rails, nose and tail rocker), a brass
@@ -84,12 +85,16 @@ export function buildSurferModel() {
 	geo.computeVertexNormals();
 	// lacquered wood deck on top, dark hull underneath
 	const boardMat = new THREE.MeshStandardNodeMaterial( { roughness: 0.4, metalness: 0.05 } );
+	const D = ASSETS.textures.deck, deckUV = vec2( positionLocal.z.mul( 0.9 ), positionLocal.x.mul( 0.9 ) );
+	if ( D ) boardMat.normalNode = normalMap( texture( D.nor, deckUV ) );
 	boardMat.colorNode = Fn( () => {
 
 		const top = smoothstep( 0.04, 0.09, positionLocal.y );
 		// wood grain along the board
 		const grain = sin( positionLocal.x.mul( 90 ).add( sin( positionLocal.z.mul( 6 ) ).mul( 2 ) ) ).mul( 0.5 ).add( 0.5 );
-		const wood = mix( color( 0x3a1f0e ), color( 0x5c3418 ), grain );
+		let wood = mix( color( 0x3a1f0e ), color( 0x5c3418 ), grain );
+		// the CC0 dark planks (Assets.js) when loaded, running along the board
+		if ( D ) wood = texture( D.diff, deckUV ).rgb;
 		return mix( color( 0x1d1a2e ), wood, top );
 
 	} )();
@@ -259,6 +264,15 @@ function sailMaterial() {
 
 	const mat = new THREE.MeshStandardNodeMaterial( { side: THREE.DoubleSide, roughness: 0.75 } );
 	const u = uv().x, v = uv().y;
+	// the CC0 linen weave (Assets.js): its normal and roughness give the canvas a real cloth texture
+	const L = ASSETS.textures.linen;
+	if ( L ) {
+
+		const weave = uv().mul( vec2( 5, 9 ) );
+		mat.normalNode = normalMap( texture( L.nor, weave ) );
+		mat.roughnessNode = texture( L.arm, weave ).g;
+
+	}
 	// the trailing edge flutters; the luff on the mast stays put
 	mat.positionNode = positionLocal.add( vec3( 0, 0, sin( time.mul( 11 ).add( v.mul( 7 ) ).sub( u.mul( 4 ) ) ).mul( 0.022 ).mul( u.mul( u ) ) ) );
 	// canvas with darker panel seams; the battens are solar strips that glow gold

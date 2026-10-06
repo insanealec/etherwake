@@ -453,8 +453,18 @@ TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
 4. ✅ (light shafts; the sky nebulae stay the 2D cliffs for now) **Volumetric sky nebulae** and light shafts through the cloud volume.
 5. ✅ (auto exposure; motion blur skipped: the user is sensitive to camera disorientation, and the speed
    lines carry the speed) **Motion blur** (from the velocity MRT) and auto exposure.
-6. **Hero materials:** CC0 PBR textures (Poly Haven / ambientCG) for wood, brass and canvas.
+6. 🟡 (in progress, see Status) **Hero materials:** CC0 PBR textures (Poly Haven / ambientCG) for wood, brass and canvas.
 Each slice: measure the frame cost (ms) before and after, keep a URL flag to turn it off.
+
+**Slice 6 status (2026-10-06, usage limit hit mid-slice):** CC0 Poly Haven assets downloaded to
+`public/assets/` and credited in CREDITS.md (weathered_brown_planks, dark_wooden_planks, rough_linen
+normal+ARM, Lantern_01 glTF). `world/Assets.js` loads them before the world is built (`loadAssets`,
+`applyWood`, `lantern()`), with fallbacks to the procedural look. Wired: galleon hull planks + normal,
+deck, lanterns; port boardwalk (world-mapped) + 24 brass lanterns; the board's deck; linen weave on the
+rider's sail; sky reflections (`App.buildEnvironment`: the sky background in a 256 cube map as
+`scene.environment`, intensity 0.8, `?noReflections`). It loads without errors, but is **not yet checked
+visually or for cost**: next session, screenshot the galleon, harbour and board, tune texture scales
+and tints, check the lantern sizes, and measure the frame cost (816k lantern triangles at the harbour).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

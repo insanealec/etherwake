@@ -1,10 +1,11 @@
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, time, positionWorld, positionLocal, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
+import { Fn, uniform, vec2, vec3, float, length, mix, smoothstep, abs, sin, fract, uv, time, texture, normalMap, positionWorld, positionLocal, cameraPosition, mx_fractal_noise_float } from 'three/tsl';
 import { GALLEON, HARBOR } from './WorldLayout.js';
 import { RING_OUT } from './Port.js';
 import { sailPower } from './Wind.js';
 import { buildFigure } from '../player/Figure.js';
 import { boardRatio } from '../game/Gear.js';
+import { ASSETS, applyWood, lantern } from './Assets.js';
 
 // The solar galleon (milestone 7), procedural first pass in a Treasure Planet-like spirit (our own
 // design): a wooden hull with a rising sheer and brass trim, a stern castle with lit windows, a
@@ -244,12 +245,21 @@ export class Galleon {
 	build() {
 
 		const wood = new THREE.MeshStandardNodeMaterial( { roughness: 0.75, side: THREE.DoubleSide } );
+		const P = ASSETS.textures.planks, hullUV = uv().mul( vec2( 12, 4 ) );
+		if ( P ) {
+
+			wood.normalNode = normalMap( texture( P.nor, hullUV ) );
+			wood.roughnessNode = texture( P.arm, hullUV ).g;
+
+		}
 		// hull planks with a brass rail stripe along the top
 		wood.colorNode = Fn( () => {
 
 			const grain = mx_fractal_noise_float( positionWorld.mul( vec3( 0.4, 3.0, 0.4 ) ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
 			const planks = smoothstep( 0.0, 0.08, abs( fract( uv().y.mul( 9.0 ) ).sub( 0.5 ) ) );
 			const base = mix( vec3( 0.13, 0.05, 0.03 ), vec3( 0.3, 0.12, 0.06 ), grain ).mul( planks.mul( 0.35 ).add( 0.65 ) ).toVar();
+			// the CC0 plank texture, when loaded (Assets.js), run along the hull
+			if ( P ) base.assign( texture( P.diff, hullUV ).rgb.mul( vec3( 0.85, 0.7, 0.6 ) ) );
 			// copper sheathing gone to verdigris below the waterline, a brass wale stripe, the gold rail band
 			const copper = mix( vec3( 0.05, 0.22, 0.2 ), vec3( 0.32, 0.16, 0.07 ), grain.mul( grain ) ).mul( planks.mul( 0.2 ).add( 0.8 ) );
 			base.assign( mix( copper, base, smoothstep( 0.3, 0.34, uv().y ) ) );
@@ -258,7 +268,8 @@ export class Galleon {
 
 		} )();
 		const deckWood = new THREE.MeshStandardNodeMaterial( { roughness: 0.85 } );
-		deckWood.colorNode = Fn( () => {
+		const deckTextured = applyWood( deckWood, 'deck', uv().yx.mul( 0.3 ) ); // planks along the ship
+		if ( ! deckTextured ) deckWood.colorNode = Fn( () => {
 
 			const grain = mx_fractal_noise_float( positionWorld.mul( vec3( 2.0, 0.5, 0.25 ) ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
 			return mix( vec3( 0.24, 0.14, 0.07 ), vec3( 0.42, 0.26, 0.13 ), grain );
@@ -382,9 +393,17 @@ export class Galleon {
 		// stern and bow lanterns
 		for ( const [ x, y, z ] of [ [ 3.2, 3.9, - HALF + 1.5 ], [ - 3.2, 3.9, - HALF + 1.5 ], [ 0, 2.8, HALF - 0.5 ] ] ) {
 
-			const l = new THREE.Mesh( new THREE.SphereGeometry( 0.35, 10, 8 ), glow );
+			// a brass hurricane lantern (CC0 model, Assets.js) with a glowing heart, or just the glow
+			const model = lantern( 0.9 );
+			const l = new THREE.Mesh( new THREE.SphereGeometry( model ? 0.14 : 0.35, 10, 8 ), glow );
 			l.position.set( x, y, z );
 			g.add( l );
+			if ( model ) {
+
+				model.position.set( x, y - 0.38, z );
+				g.add( model );
+
+			}
 
 		}
 		// a rose-gold beacon beam from the mainmast, fading upward and as you get close

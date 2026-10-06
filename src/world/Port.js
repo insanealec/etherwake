@@ -1,7 +1,8 @@
 import * as THREE from 'three/webgpu';
-import { Fn, vec3, mix, positionWorld, mx_fractal_noise_float } from 'three/tsl';
+import { Fn, vec2, vec3, mix, abs, positionWorld, normalWorld, mx_fractal_noise_float } from 'three/tsl';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HARBOR } from './WorldLayout.js';
+import { applyWood, lantern } from './Assets.js';
 
 // Brasslight Harbor (working name), procedural first pass (milestone 4): a floating moonlet ringed by a
 // boardwalk on pilings, lanterns, shacks, banners and a lighthouse with a sweeping beam. You dock and
@@ -45,8 +46,10 @@ export class Port {
 	materials() {
 
 		const wood = new THREE.MeshStandardNodeMaterial( { roughness: 0.85 } );
-		// weathered wood: streaky grain noise
-		wood.colorNode = Fn( () => {
+		// the CC0 weathered plank texture (Assets.js), mapped from world position: tops by xz, sides by
+		// their run and height; without it, streaky grain noise
+		const plankUV = abs( normalWorld.y ).greaterThan( 0.5 ).select( positionWorld.xz, vec2( positionWorld.x.add( positionWorld.z ), positionWorld.y ) ).mul( 0.4 );
+		if ( ! applyWood( wood, 'planks', plankUV, vec3( 0.85, 0.72, 0.62 ) ) ) wood.colorNode = Fn( () => {
 
 			const grain = mx_fractal_noise_float( positionWorld.mul( vec3( 0.6, 2.0, 0.6 ) ), 3, 2.0, 0.5 ).mul( 0.5 ).add( 0.5 );
 			return mix( vec3( 0.16, 0.08, 0.035 ), vec3( 0.32, 0.17, 0.08 ), grain );
@@ -123,13 +126,23 @@ export class Port {
 		// lantern posts around the outer edge, and a few warm point lights over the boardwalk
 		const count = 24;
 		const posts = new THREE.InstancedMesh( new THREE.CylinderGeometry( 0.06, 0.08, 3, 6 ), brass, count );
-		const lamps = new THREE.InstancedMesh( new THREE.SphereGeometry( 0.22, 10, 8 ), glow, count );
+		// a brass hurricane lantern on each post (CC0 model, Assets.js) with a glowing heart; or just a glow
+		const model = lantern( 0.7 );
+		const lamps = new THREE.InstancedMesh( new THREE.SphereGeometry( model ? 0.1 : 0.22, 10, 8 ), glow, count );
 		const m = new THREE.Matrix4();
 		for ( let i = 0; i < count; i ++ ) {
 
 			const a = ( i + 0.25 ) / count * Math.PI * 2, r = RING_OUT - 0.4;
 			posts.setMatrixAt( i, m.makeTranslation( Math.cos( a ) * r, DECK_Y + 1.5, Math.sin( a ) * r ) );
-			lamps.setMatrixAt( i, m.makeTranslation( Math.cos( a ) * r, DECK_Y + 3.1, Math.sin( a ) * r ) );
+			lamps.setMatrixAt( i, m.makeTranslation( Math.cos( a ) * r, DECK_Y + ( model ? 3.28 : 3.1 ), Math.sin( a ) * r ) );
+			if ( model ) {
+
+				const l = i ? model.clone() : model;
+				l.position.set( Math.cos( a ) * r, DECK_Y + 3.0, Math.sin( a ) * r );
+				l.rotation.y = - a;
+				this.group.add( l );
+
+			}
 
 		}
 		this.group.add( posts, lamps );

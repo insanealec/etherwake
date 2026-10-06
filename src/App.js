@@ -16,6 +16,7 @@ import { FlyCamera } from './core/FlyCamera.js';
 import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Title, TITLE } from './ui/Title.js';
 import { AutoExposure } from './post/Exposure.js';
+import { loadAssets } from './world/Assets.js';
 import { SeaHeight } from './sea/SeaHeight.js';
 import { Volume, VOLUME } from './sea/Volume.js';
 import { Surfer } from './player/Surfer.js';
@@ -103,6 +104,7 @@ export class App {
 		await this.renderer.init();
 		this.backend = this.renderer.backend.isWebGPUBackend ? 'webgpu' : 'webgl2';
 		console.info( `[etherwake] renderer backend: ${ this.backend }` );
+		await loadAssets(); // CC0 textures and models (world/Assets.js), before the world is built
 		const gpu = this.renderer.backend.device?.adapterInfo || this.renderer.backend.adapter?.info;
 		if ( gpu ) console.info( `[etherwake] GPU: ${ gpu.vendor } ${ gpu.architecture } ${ gpu.description || '' }` );
 		// ?stats: frame rate, the slowest frame of the last second, the GPU and the canvas size
@@ -124,6 +126,7 @@ export class App {
 		this.motes = this.params.has( 'noMotes' ) ? [] : Object.values( MOTE_LAYERS ).map( ( layer ) => new Motes( this.scene, this.sea, layer ) );
 		this.tweaks = new TweakPanel( this );
 		this.buildPipeline();
+		if ( ! this.params.has( 'noReflections' ) ) this.buildEnvironment();
 		this.buildLights();
 
 		this.port = new Port( this.scene );
@@ -1079,6 +1082,23 @@ export class App {
 		S.frames = 0;
 		S.worst = 0;
 		S.since = now;
+
+	}
+
+	// Reflections: the game's own sky (nebula cliffs, gas giant glow, the sun) rendered once into a cube
+	// map and used as the scene's environment, so brass, the board and the hull reflect the real space
+	// sky instead of nothing (renderer state saved and restored around it). ?noReflections to compare.
+	buildEnvironment() {
+
+		const sky = new THREE.Scene();
+		sky.backgroundNode = this.scene.backgroundNode;
+		const target = new THREE.CubeRenderTarget( 256, { type: THREE.HalfFloatType } );
+		const cam = new THREE.CubeCamera( 1, 100, target );
+		const state = THREE.RendererUtils.resetRendererState( this.renderer );
+		cam.update( this.renderer, sky );
+		THREE.RendererUtils.restoreRendererState( this.renderer, state );
+		this.scene.environment = target.texture;
+		this.scene.environmentIntensity = 0.8;
 
 	}
 
