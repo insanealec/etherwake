@@ -196,12 +196,11 @@ export class App {
 		const scenePass = pass( this.scene, this.camera );
 		let scene = scenePass.getTextureNode( 'output' );
 		// the volumetric etherium: raymarched near the camera, composited over the scene before TRAA so
-		// its jittered samples get averaged (graphics pass 3, slice 2). Opt-in with ?volume while it's
-		// being tuned (it isn't yet better than the mesh sea)
-		if ( this.params.has( 'volume' ) ) {
+		// its jittered samples get averaged (graphics pass 3, slice 2); ?noVolume keeps the mesh-only sea
+		if ( ! this.params.has( 'noVolume' ) ) {
 
 			this.seaHeight = new SeaHeight( this.sea );
-			this.volume = new Volume( this.sea, this.seaHeight, scenePass.getTextureNode( 'depth' ) );
+			this.volume = new Volume( this.sea, this.seaHeight, scenePass.getTextureNode( 'depth' ), this.camera );
 			this.sea.useVolume( VOLUME.range );
 			this.cameraClearance = VOLUME.cameraClear; // look down onto the cloud tops, not through them
 			if ( this.puffs ) this.puffs.mesh.visible = false;

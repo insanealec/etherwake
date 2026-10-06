@@ -1,7 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
-	Fn, uniform, float, vec2, vec3, vec4, Loop, If, Break, screenUV, screenCoordinate, cameraPosition,
-	cameraWorldMatrix, cameraProjectionMatrixInverse, getViewPosition, texture3D, smoothstep, mix, max,
+	Fn, uniform, float, vec2, vec3, vec4, Loop, If, Break, screenUV, screenCoordinate, getViewPosition, texture3D, smoothstep, mix, max,
 	min, exp, dot, normalize, length, fract, rtt, pow
 } from 'three/tsl';
 import { PALETTE, cloudColor } from './Etherium.js';
@@ -14,38 +13,50 @@ import { cloudNoiseTexture } from './CloudNoise.js';
 // self-shadowing (bright tops, shaded folds, a silver lining against the light), plus sky light from
 // above and the crest colours glowing from inside. Rendered at reduced resolution with a jittered start
 // (TRAA in App blends the jitter away), stopped by the scene's depth (the board, ships and port), and
-// faded out by VOLUME.range, where the sea mesh takes over. Opt-in with ?volume (work in progress);
-// ?volDebug shows the raw noise (r, g) and the density 30 m out (b).
+// faded out by VOLUME.range, where the sea mesh takes over. ?noVolume turns it off. Debug views:
+// ?volDebug (raw noise r/g, density 30 m out in b), =n (first-hit normals), =t (hit distance / 60 m),
+// =e (ray start, end and where the march stopped, / 220 m), =d (scene depth, view z and distance / 220 m).
 export const VOLUME = {
 	range: 220, // metres of raymarched sea; the mesh is drawn beyond (it fades out from 0.65 of this)
-	steps: 72, // samples per ray (at most)
+	steps: 96, // samples per ray (at most): enough for the growing steps to reach the range
 	minStep: 0.25, // metres; steps grow with distance (stepGrowth of the distance travelled)
 	stepGrowth: 0.045,
+	maxSlope: 0.7, // steepest rise of the cloud top, for skipping empty space safely
 	lightSteps: [ 0.4, 1.3, 3.0 ], // distances toward the sun of the shadow samples (m)
 	lightDensity: 0.3, // extinction scale for sunlight (lower: light reaches deeper into the billows)
 	sun: 0.5, // extra forward-scattered sunlight looking toward the sun
 	normalStep: 0.4, // metres, for the density gradient
-	top: 3.0, // the billows reach this far above the swell (m)
+	top: 5.0, // the gas (lumps, fringe, loose puffs) stays within this far above the swell (m)
 	cameraClear: 4.8, // the chase camera keeps this far above the swell, above the billows (App)
-	solid: 2.5, // solid cloud from this deep below the swell (m)
-	baseScale: 16, // metres per tile of the billow noise
+	baseScale: 12, // metres per tile of the fringe noise
 	detailScale: 7, // metres per tile of the detail noise
-	erode: 0.4, // how much the detail eats the billows' edges
+	lumps: 1.8, // the mesh's lumps, taller in the volume (the mesh fakes their relief with its normals)
+	relief: 2, // normal tilt exaggeration
+	fringe: 1.6, // metres the 3D noise lifts or cuts the cloud top
+	erode: 0.9, // metres of finer fraying
+	edge: 0.35, // half-thickness of the cloud top's soft edge (m)
+	puffs: 0.6, // loose puffs' density (0: none)
+	puffScale: 30, puffHeight: 3.5, // loose puffs above the tops: noise tile (m), how high they drift
 	density: 4, // extinction per metre at full density (high: cloud tops with crisp silhouettes)
 	drift: [ 0.9, 0.12, 0.25 ], // m/s, the billows' slow flow
 	forward: 0.55, // forward scattering (silver lining) strength
-	tunnel: 3.5, // radius of the clear view from the camera to the board (m)
-	resolution: 0.5 // of the screen
+	tunnel: 2.6, // radius of the clear view from the camera to the board (m)
+	resolution: 1 // of the screen
 };
 
-const DEBUG = new URLSearchParams( location.search ).has( 'volDebug' );
+const DEBUG = new URLSearchParams( location.search ).get( 'volDebug' ); // '' (noise), 'n' (normals), 't' (hit distance / 60 m)
 
 export class Volume {
 
-	// sea: Etherium; seaHeight: SeaHeight; depthNode: the scene pass's depth texture node
-	constructor( sea, seaHeight, depthNode ) {
+	// sea: Etherium; seaHeight: SeaHeight; depthNode: the scene pass's depth texture node; camera: the
+	// game camera (inside this full-screen pass three's camera nodes mean the quad's camera, so the game
+	// camera's matrices are bound explicitly; they're read at render time, jitter included)
+	constructor( sea, seaHeight, depthNode, camera ) {
 
 		const V = VOLUME;
+		const cameraPosition = uniform( camera.position );
+		const cameraWorldMatrix = uniform( camera.matrixWorld );
+		const cameraProjectionMatrixInverse = uniform( camera.projectionMatrixInverse );
 		this.uBoard = uniform( new THREE.Vector3( 0, - 1000, 0 ) );
 		this.uFrame = uniform( 0 );
 		const noise = cloudNoiseTexture( 64 );
@@ -57,22 +68,28 @@ export class Volume {
 		// density at world point p (0..1), plus the swell height there (for the crest glow)
 		const densityAt = ( p ) => {
 
-			const surf = seaHeight.node( p.xz );
+			// the cloud top: the swell plus the sea mesh's own lumps (shared, so near and far match)
+			const hs = seaHeight.sample( p.xz );
+			const surf = hs.r;
 			const h = p.y.sub( surf );
-			const coverage = smoothstep( V.top, - 0.6, h ); // 1 under the swell, 0 at the top of the band
 			const flow = vec3( ...V.drift ).mul( t );
-			const base = smoothstep( 0.3, 0.78, texture3D( noise, p.sub( flow ).div( V.baseScale ) ).level( 0 ).r ); // stretched: the noise sits mid-range
-			const billow = base.sub( coverage.oneMinus() ).div( coverage.max( 0.001 ) ).clamp(); // remap by coverage
+			const base = texture3D( noise, p.sub( flow ).div( V.baseScale ) ).level( 0 ).r;
 			const detail = texture3D( noise, p.sub( flow.mul( 1.6 ) ).div( V.detailScale ) ).level( 0 ).g;
-			const shaped = smoothstep( 0.05, 0.35, billow.sub( detail.mul( V.erode ).mul( billow.oneMinus() ) ) ); // firm edges, wispy fringe
-			const solid = smoothstep( - 0.4, - V.solid, h ); // thick below
-			// the board parts the gas, and a tunnel stays clear from the camera to the board so the view is
-			// never smothered (the chase camera rides inside the billow band)
-			const ab = this.uBoard.sub( cameraPosition );
+			// 3D noise frays the top: overhangs and wisps the heightfield can't make
+			const top = surf.add( hs.g.mul( V.lumps ) ).add( base.sub( 0.55 ).mul( V.fringe ) );
+			const above = p.y.sub( top ).add( detail.sub( 0.5 ).mul( V.erode ) );
+			const body = smoothstep( V.edge, V.edge * - 1, above );
+			// now and then a loose puff drifts above the tops
+			const puff = smoothstep( 0.72, 0.86, texture3D( noise, p.sub( flow.mul( 0.7 ) ).div( V.puffScale ).add( 0.37 ) ).level( 0 ).r )
+				.mul( smoothstep( V.puffHeight, 0.5, above ) ).mul( smoothstep( - 0.5, 0.8, above ) ).mul( V.puffs )
+				.mul( smoothstep( 5, 18, length( p.sub( cameraPosition ) ) ) ); // not in the camera's face
+			// the board parts the gas; a slim tunnel keeps the camera's view of the board clear
+			const rider = this.uBoard.add( vec3( 0, 1.2, 0 ) ); // aim at the rider's chest
+			const ab = rider.sub( cameraPosition );
 			const along = p.sub( cameraPosition ).dot( ab ).div( ab.dot( ab ).max( 1e-3 ) ).clamp();
 			const tunnel = length( p.sub( cameraPosition.add( ab.mul( along ) ) ) );
-			const carve = smoothstep( 1.0, 3.2, length( p.sub( this.uBoard ) ) ).mul( smoothstep( V.tunnel * 0.4, V.tunnel, tunnel ) );
-			return { d: max( shaped, solid ).mul( carve ), surf, h };
+			const carve = smoothstep( 0.8, 2.0, length( p.sub( this.uBoard ) ) ).mul( smoothstep( V.tunnel * 0.4, V.tunnel, tunnel ) );
+			return { d: max( body, puff ).mul( carve ), surf, h, occ: hs.b };
 
 		};
 
@@ -88,12 +105,15 @@ export class Volume {
 			const tScene = depth.greaterThanEqual( 0.9999 ).select( float( 1e6 ), length( toScene ) );
 
 			// clip to the slab the cloud lives in (the swell's range plus the billow band) and to the range
-			const yTop = sea.uMaxAmp.mul( 1.6 ).add( V.top + 2 ), yBot = sea.uMaxAmp.mul( - 1.6 ).sub( V.solid + 4 );
+			const yTop = sea.uMaxAmp.mul( 1.6 ).add( V.top + 2 ), yBot = sea.uMaxAmp.mul( - 1.6 ).sub( 6 );
 			const inv = float( 1 ).div( rd.y.abs().max( 1e-4 ).mul( rd.y.greaterThanEqual( 0 ).select( float( 1 ), float( - 1 ) ) ) );
 			const ta = yTop.sub( ro.y ).mul( inv ), tb = yBot.sub( ro.y ).mul( inv );
 			const t0 = max( min( ta, tb ), 0 ), t1 = min( min( max( ta, tb ), tScene ), V.range );
 
+			const ttEnd = float( - 1 ).toVar(); // debug: where the march stopped
 			const S = vec3( 0 ).toVar(); // light scattered toward the camera
+			const hitN = vec3( 0 ).toVar(); // debug: the normal where the ray first meets dense gas
+			const hitT = float( - 1 ).toVar();
 			const T = float( 1 ).toVar(); // transmittance
 			If( t1.greaterThan( t0 ), () => {
 
@@ -121,7 +141,8 @@ export class Volume {
 					const gap = s.h.sub( V.top + 0.3 );
 					If( gap.greaterThan( 0 ), () => {
 
-						step.assign( max( step, gap.mul( 0.8 ).div( max( rd.y.negate(), 0.12 ) ) ) );
+						// safe distance: the ray can't meet gas sooner, even if the swell rises ahead (slope <= V.maxSlope)
+						step.assign( max( step, gap.mul( 0.9 ).div( max( rd.y.negate(), 0 ).add( V.maxSlope ) ) ) );
 
 					} );
 					If( s.d.greaterThan( 0.003 ), () => {
@@ -145,11 +166,17 @@ export class Volume {
 						const gx = densityAt( p.add( vec3( e, 0, 0 ) ) ).d.sub( s.d );
 						const gy = densityAt( p.add( vec3( 0, e, 0 ) ) ).d.sub( s.d );
 						const gz = densityAt( p.add( vec3( 0, 0, e ) ) ).d.sub( s.d );
-						const grad = vec3( gx, gy, gz );
+						const grad = vec3( gx.mul( V.relief ), gy, gz.mul( V.relief ) ); // tilted harder, as the mesh's bumps are
 						const N = length( grad ).greaterThan( 1e-4 ).select( normalize( grad.negate() ), vec3( 0, 1, 0 ) );
+						If( hitT.lessThan( 0 ).and( s.d.greaterThan( 0.5 ) ), () => {
+
+							hitN.assign( N );
+							hitT.assign( tt );
+
+						} );
 						const tint = smoothstep( 0.3, 0.7, texture3D( noise, p.div( 420 ) ).level( 0 ).r ); // broad colour drift
 						const crest = smoothstep( - 0.3, 0.75, s.surf.div( sea.uMaxAmp ) );
-						const col = cloudColor( N, L, rd.negate(), crest, tint, sun.mul( 0.7 ).add( 0.3 ), c )
+						const col = cloudColor( N, L, rd.negate(), crest, tint, sun.mul( 0.35 ).add( 0.65 ).mul( s.occ.mul( 0.25 ).add( 0.75 ) ), c )
 							.add( c( 'sun' ).mul( sun.mul( phase.sub( 1 ).max( 0 ) ).mul( V.sun ) ) ); // extra glow looking into the light
 						// the region's tint and the distance haze, as on the sea mesh
 						const fogged = mix( sea.regionTint( col ), sea.uFogColor, exp( sea.uFogDensity.mul( tt ).pow( 2 ).negate() ).oneMinus() );
@@ -162,9 +189,14 @@ export class Volume {
 					tt.addAssign( step );
 
 				} );
+				ttEnd.assign( tt );
 
 			} );
-			if ( DEBUG ) {
+			if ( DEBUG === 'd' ) return vec4( depth, viewPos.z.negate().div( 220 ), length( toScene ).div( 220 ), 0 );
+			if ( DEBUG === 'e' ) return vec4( t0.div( 220 ), t1.div( 220 ), ttEnd.div( 220 ), 0 );
+			if ( DEBUG === 'n' ) return vec4( hitN.mul( 0.5 ).add( 0.5 ), 0 );
+			if ( DEBUG === 't' ) return vec4( vec3( hitT.div( 60 ) ), 0 );
+			if ( DEBUG !== null ) {
 
 				const dp = ro.add( rd.mul( 30 ) );
 				const n = texture3D( noise, dp.div( V.baseScale ) ).level( 0 );
