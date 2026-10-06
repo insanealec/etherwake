@@ -454,7 +454,8 @@ export class Etherium {
 
 			// the big billows lift the mesh near the camera (further out they're only shading)
 			const xz = p.add( w.disp.xz );
-			const near = smoothstep( 220.0, 90.0, length( xz.sub( cameraPosition.xz ) ) );
+			// (out past the volumetric etherium's range too, so where it hands over both have these lumps)
+			const near = smoothstep( 450.0, 300.0, length( xz.sub( cameraPosition.xz ) ) );
 			const lift = billow( xz, this.uTime, float( 0 ) ).h.mul( near );
 			vNormal.assign( normalize( cross( w.bin, w.tan ) ) );
 			vWorld.assign( vec3( xz.x, w.disp.y.add( lift ), xz.y ) );
@@ -481,7 +482,7 @@ export class Etherium {
 			If( this.uVolumeRange.greaterThan( 0 ), () => {
 
 				const dither = fract( fract( dot( screenCoordinate.xy, vec2( 0.06711056, 0.00583715 ) ) ).mul( 52.9829189 ) );
-				If( dist.lessThan( this.uVolumeRange.mul( dither.mul( 0.15 ).add( 0.65 ) ) ), () => {
+				If( dist.lessThan( this.uVolumeRange.mul( dither.mul( 0.1 ).add( 0.85 ) ) ), () => {
 
 					Discard();
 

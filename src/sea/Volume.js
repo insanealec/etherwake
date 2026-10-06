@@ -17,7 +17,7 @@ import { cloudNoiseTexture } from './CloudNoise.js';
 // ?volDebug (raw noise r/g, density 30 m out in b), =n (first-hit normals), =t (hit distance / 60 m),
 // =e (ray start, end and where the march stopped, / 220 m), =d (scene depth, view z and distance / 220 m).
 export const VOLUME = {
-	range: 220, // metres of raymarched sea; the mesh is drawn beyond (it fades out from 0.65 of this)
+	range: 220, // metres of raymarched sea; the mesh takes over through a dithered band at 0.85..0.95 of this
 	steps: 96, // samples per ray (at most): enough for the growing steps to reach the range
 	minStep: 0.25, // metres; steps grow with distance (stepGrowth of the distance travelled)
 	stepGrowth: 0.045,
@@ -80,7 +80,9 @@ export class Volume {
 			// level of detail: the fine fraying fades with distance (far away it's finer than a pixel and
 			// turns to blotches), and the edge softens, so the far volume matches the smooth mesh lumps
 			const near = smoothstep( V.detailFar, V.detailNear, length( p.sub( cameraPosition ) ) );
-			const top = surf.add( hs.g.mul( V.lumps ) ).add( base.sub( 0.55 ).mul( V.fringe ).mul( near ) );
+			// up close both lump sizes, taller; further out just the big lumps, exactly the sea mesh's geometry,
+			// so where the mesh takes over the shapes match
+			const top = surf.add( mix( hs.a, hs.g.mul( V.lumps ), near ) ).add( base.sub( 0.55 ).mul( V.fringe ).mul( near ) );
 			const above = p.y.sub( top ).add( detail.sub( 0.5 ).mul( V.erode ).mul( near ) );
 			const edge = near.oneMinus().mul( V.edge * 1.5 ).add( V.edge );
 			const body = smoothstep( edge, edge.negate(), above );
@@ -110,7 +112,9 @@ export class Volume {
 			const tScene = depth.greaterThanEqual( 0.9999 ).select( float( 1e6 ), length( toScene ) );
 
 			// clip to the slab the cloud lives in (the swell's range plus the billow band) and to the range
-			const yTop = sea.uMaxAmp.mul( 1.6 ).add( V.top + 2 ), yBot = sea.uMaxAmp.mul( - 1.6 ).sub( 6 );
+			// generous: flare-fronts, ring waves and the Flare Reach's taller swell rise well above uMaxAmp
+			// (empty space is skipped, so a tall slab costs little)
+			const yTop = sea.uMaxAmp.mul( 3.5 ).add( V.top + 15 ), yBot = sea.uMaxAmp.mul( - 3.5 ).sub( 15 );
 			const inv = float( 1 ).div( rd.y.abs().max( 1e-4 ).mul( rd.y.greaterThanEqual( 0 ).select( float( 1 ), float( - 1 ) ) ) );
 			const ta = yTop.sub( ro.y ).mul( inv ), tb = yBot.sub( ro.y ).mul( inv );
 			const t0 = max( min( ta, tb ), 0 ), t1 = min( min( max( ta, tb ), tScene ), V.range );
@@ -192,7 +196,7 @@ export class Volume {
 							.add( c( 'sun' ).mul( sun.mul( phase.sub( 1 ).max( 0 ) ).mul( V.sun ) ) ); // extra glow looking into the light
 						// the region's tint and the distance haze, as on the sea mesh
 						const fogged = mix( sea.regionTint( col ), sea.uFogColor, exp( sea.uFogDensity.mul( tt ).pow( 2 ).negate() ).oneMinus() );
-						const ext = s.d.mul( V.density ).mul( step ).mul( smoothstep( V.range, V.range * 0.65, tt ) );
+						const ext = s.d.mul( V.density ).mul( step ).mul( smoothstep( V.range, V.range * 0.85, tt ) );
 						const a = exp( ext.negate() );
 						S.addAssign( fogged.mul( T ).mul( a.oneMinus() ) );
 						T.mulAssign( a );

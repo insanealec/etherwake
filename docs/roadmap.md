@@ -323,6 +323,12 @@
   now a smoothstep. (3) Distance LOD: the 3D fraying fades 25..90 m, the edge softens and the normal
   exaggeration goes away with distance. (4) The height texture is 32-bit float (half floats at +100 m
   snap to ~6 cm). ~3.7-3.9 ms/frame at 651x700.
+  Second follow-up ("some cloud peaks are glitchy"): the march slab was sized for plain swell, so taller
+  crests (regions, flare-fronts) were sliced flat: now +-3.5x uMaxAmp + 15 m (empty space is skipped).
+  The hand-off disagreed: the volume drew both lump sizes x1.8 while the mesh's lumps faded out by 220 m.
+  Now SeaHeight's alpha holds the big lumps alone; the volume blends to exactly those beyond its detail
+  range, the mesh keeps its lumps out to 300..450 m, and the dithered hand-off is narrower (0.85..0.95
+  of the range).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,

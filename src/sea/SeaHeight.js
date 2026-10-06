@@ -6,7 +6,8 @@ import { etheriumWaves, billow } from './Etherium.js';
 // solved back to the world point, as Etherium.heightAt does) plus the bow waves, flare-fronts and ring
 // waves. Shaders that need the surface at arbitrary points (the volumetric etherium) sample this
 // instead of re-running the wave sum. `node( xz )` returns the height at world xz (metres); `sample( xz )`
-// returns ( swell height, cloud-lump height above it, lump crease occlusion ).
+// returns ( swell height, cloud-lump height above it, lump crease occlusion, the big lumps alone (what the
+// sea mesh's geometry carries) ).
 export const SEA_HEIGHT = { size: 512, res: 512, offset: 100 }; // metres covered, texels; height stored + offset
 // (the render target clamps negative values, so troughs would read as 0)
 
@@ -37,7 +38,7 @@ export class SeaHeight {
 			const w = etheriumWaves( p, sea.uWaves, sea.uTime, sea.uHeight, this.uCenter );
 			// the sea mesh's cloud lumps on top (both sizes), so the volume and the mesh share one shape
 			const b = billow( xz, sea.uTime, 1 );
-			return vec4( w.disp.y.add( SEA_HEIGHT.offset ), b.h, b.occ, 1 );
+			return vec4( w.disp.y.add( SEA_HEIGHT.offset ), b.h, b.occ, billow( xz, sea.uTime, 0 ).h );
 
 		} )();
 		this.quad = new THREE.QuadMesh( mat );
