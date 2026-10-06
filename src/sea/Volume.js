@@ -51,7 +51,11 @@ export const VOLUME = {
 	hull: [ [ 0, - 0.5, 0 ], [ 4.6, 3.8, 18.5 ] ],
 	shipSails: [ [ [ 0, 13.5, 6.4 ], [ 5.2, 5, 0.9 ] ], [ [ 0, 15.5, - 2.6 ], [ 6.2, 6, 0.9 ] ] ],
 	shadow: 0.6, // how dark a full shadow is (1: black)
-	contact: 0.45 // how dark the gas right against a caster is
+	contact: 0.45, // how dark the gas right against a caster is
+	// light shafts in the air above the clouds: within range m of the camera and height m of the swell,
+	// a haze (density per m, thinning with height over falloff m) lit where the probes toward the sun
+	// find no cloud
+	shafts: { range: 150, height: 30, density: 0.02, falloff: 10, probe: [ 4, 12, 30 ], maxStep: 6, strength: 0.12 }
 };
 
 const DEBUG = new URLSearchParams( location.search ).get( 'volDebug' ); // '' (noise), 'n' (normals), 't' (hit distance / 60 m)
@@ -257,6 +261,30 @@ export class Volume {
 						const a = exp( ext.negate() );
 						S.addAssign( fogged.mul( T ).mul( a.oneMinus() ) );
 						T.mulAssign( a );
+
+					} ).Else( () => {
+
+						// light shafts (graphics pass 3, slice 4): the open air above the clouds holds a faint
+						// glowing haze, lit only where nothing blocks the sun; behind a crest it stays dark, so
+						// with the sun this low, beams and shadow shafts stream between the swells
+						const SH = V.shafts;
+						If( tt.lessThan( SH.range ).and( s.h.lessThan( SH.height ) ), () => {
+
+							// cheap probes toward the sun: against the cloud-top heightfield only (one texture read
+							// each, no 3D noise): the crests are what cast the shafts
+							let lit = casters( p ).shadow;
+							for ( const dist of SH.probe ) {
+
+								const q = p.add( L.mul( dist ) );
+								const hq = seaHeight.sample( q.xz );
+								lit = lit.mul( smoothstep( - 0.8, 0.8, q.y.sub( hq.r.add( hq.g.mul( V.lumps ) ) ) ) );
+
+							}
+							const haze = exp( s.h.max( 0 ).div( - SH.falloff ) ).mul( SH.density ).mul( min( step, SH.maxStep ) );
+							const fade = smoothstep( SH.range, SH.range * 0.6, tt );
+							S.addAssign( sea.regionTint( c( 'sun' ) ).mul( lit ).mul( phase ).mul( haze ).mul( fade ).mul( T ).mul( SH.strength ) );
+
+						} );
 
 					} );
 					tt.addAssign( step );

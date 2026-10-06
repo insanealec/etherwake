@@ -358,6 +358,13 @@
   both multiply the sample's whole colour (`VOLUME.shadow` 0.6, `VOLUME.contact` 0.45). The low sun
   throws long shadows: the rider's streaks ahead, the galleon's sails lay a wide band across the sea.
   Not done: GTAO on the ship and port (needs a normal MRT), shadows on the far mesh.
+- **Graphics pass 3, slice 4: light shafts (2026-10-06).** In the volume march, air samples (no gas)
+  within `VOLUME.shafts.range` (150 m) and 30 m of the swell add a faint haze (thinning with height)
+  lit by the sun, times the forward-scattering phase, where cheap probes toward the sun (3 heightfield
+  tests against the cloud tops: swell + lumps, one texture read each) and the casters find no cover.
+  Beams and shadow shafts stream between the crests; the rider casts a shadow shaft. Full-density
+  probes cost 33 ms/frame at 1920x953; the heightfield probes ~3.5-3.9 ms total. Strength 0.12 (1.2
+  whited out the view into the sun).
 - **Nebula sea (2026-09-28, user request: "more gas-nebula-esque, particles you surf through"):** planned
   as three slices, physics untouched (surfer still rides `heightAt`). Slice 1: the sea's `colorNode` is now
   gas (domain-warped clouds drifting downwind, high-contrast dense/thin lanes, gold puffs at pinching crests,
@@ -433,7 +440,7 @@ TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
    depth. Replaces the see-through layers and the puffs; the board and the ship carve channels in it.
 3. ✅ (clouds; GTAO on the ship and port still to do) **Shadows and AO:** the rider, board and galleon shadow the clouds (shadow map read in the volume and
    the sea shader); GTAO on the ship and port.
-4. **Volumetric sky nebulae** and light shafts through the cloud volume.
+4. ✅ (light shafts; the sky nebulae stay the 2D cliffs for now) **Volumetric sky nebulae** and light shafts through the cloud volume.
 5. **Motion blur** (from the velocity MRT) and auto exposure.
 6. **Hero materials:** CC0 PBR textures (Poly Haven / ambientCG) for wood, brass and canvas.
 Each slice: measure the frame cost (ms) before and after, keep a URL flag to turn it off.
