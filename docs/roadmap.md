@@ -357,10 +357,22 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-Graphics pass 2 (the user wants it closer to Tidewater's polish). Done: nebula cliffs in the sky, the
-surfer hero model, figures, galleon dressing, motion feel, per-region look, title screen. Next: ask the
-user (candidates: a settings panel with volume and graphics quality on the title, more jobs/content per
-region, sound pass with CC0 samples). Hosting later (Cloudflare Pages), only when the user asks.
+**Graphics pass 3: stretch the limits** (user, 2026-10-06: back to the original goal of pushing how good
+it can look, Tidewater-level; the foundation is in place, now upgrade). three 0.186 ships most of the
+tools as TSL nodes in `three/addons/tsl/display/` (TRAANode, TAAUNode, GTAONode, MotionBlur,
+TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
+1. **Temporal foundation:** a velocity MRT on the scene pass and TRAA (temporal AA). Kills shimmer on
+   rigging, rails and cloud edges; later slices accumulate over frames on top of it.
+2. **The hero: a volumetric etherium.** Raymarch the cloud sea as real 3D gas near the camera (density
+   from the swell height plus 3D noise, a few light steps toward the sun for self-shadowing, emission in
+   the palette), at reduced resolution with blue-noise jitter and temporal accumulation, composited by
+   depth. Replaces the see-through layers and the puffs; the board and the ship carve channels in it.
+3. **Shadows and AO:** the rider, board and galleon shadow the clouds (shadow map read in the volume and
+   the sea shader); GTAO on the ship and port.
+4. **Volumetric sky nebulae** and light shafts through the cloud volume.
+5. **Motion blur** (from the velocity MRT) and auto exposure.
+6. **Hero materials:** CC0 PBR textures (Poly Haven / ambientCG) for wood, brass and canvas.
+Each slice: measure the frame cost (ms) before and after, keep a URL flag to turn it off.
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this
