@@ -456,7 +456,8 @@
   The old per-landing payout (`trickPayout`) is no longer used.
 - **Tricks, slice 2: grinds (2026-10-17).** `game/Grinds.js`: hold L in the air near a rail (within
   1.8 m sideways, 1.8 m above / 0.9 m below, moving along it) to lock on; the board slides along the
-  polyline (friction 4%/s, min 5 m/s); a balance meter drifts (harder the longer you grind), A/D push
+  polyline (friction 4%/s, min 5 m/s); a balance meter drifts (eases in over 1 s, then steady: tuned
+  down after the user found long grinds punishing), A/D push
   the needle left/right, past the edge = bail; Space pops off (combo continues), a rail's end launches
   you. Points 100 + 140/s as "<rail> Grind". Rails: `RAIL_PARK` (4 floating brass rails east of the
   harbour, inside the calm zone), the boardwalk railing (a loop), the galleon's cap rails

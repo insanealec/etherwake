@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { RING_OUT, DECK_Y } from '../world/Port.js';
 
 // Grinds (tricks, slice 2): hold L in the air near a rail to lock on and slide along it. A balance meter
-// wobbles (worse the longer you grind); A/D counter it, and past the edge you bail. Space pops you off
+// wobbles (gently at first, then steadily); A/D counter it, and past the edge you bail. Space pops you off
 // into the air (the combo goes on); the end of a rail launches you. A grind scores by its length and
 // joins the combo like any trick (game/Tricks.js).
 export const GRIND = {
@@ -11,9 +11,11 @@ export const GRIND = {
 	minSpeed: 5, // m/s along the rail to lock on (and the slowest you'll slide)
 	friction: 0.04, // speed lost per second (fraction)
 	points: 100, perSecond: 140,
-	wobble: 1.2, // how hard the balance drifts (grows with grind time)
-	growth: 0.25, // ... by this much per second grinding
-	counter: 2.4, // how strongly A/D push the balance back
+	wobble: 0.75, // how hard the balance drifts (steady: long grinds shouldn't get harder)
+	easeIn: 1.0, // seconds for the wobble to ease in at the start (time to settle onto the rail)
+	lean: 0.35, // extra drift the further the needle already leans (keep small, or it runs away)
+	flips: 0.3, // chance per second that the drift changes direction
+	counter: 3.0, // how strongly A/D push the balance back
 	pop: 7, // upward speed when you jump off
 	endPop: 3.5 // upward speed off the end of a rail
 };
@@ -153,7 +155,7 @@ export class Grinds {
 			if ( horiz < GRIND.minSpeed * 0.6 || Math.abs( along ) < horiz * 0.35 ) continue;
 			this.state = {
 				rail, seg: c.seg, u: c.u, dir: Math.sign( along ) || 1, speed: Math.max( GRIND.minSpeed, Math.abs( along ) ),
-				time: 0, balance: ( Math.random() - 0.5 ) * 0.2, drift: ( Math.random() < 0.5 ? - 1 : 1 )
+				time: 0, balance: 0, drift: ( Math.random() < 0.5 ? - 1 : 1 )
 			};
 			return true;
 
@@ -174,10 +176,11 @@ export class Grinds {
 		S.time += dt;
 		S.speed = Math.max( GRIND.minSpeed, S.speed * ( 1 - GRIND.friction * dt ) );
 
-		// balance: drifts one way, faster the longer you grind; A/D push it back (and nudge the drift)
-		const wobble = GRIND.wobble * ( 1 + S.time * GRIND.growth );
-		if ( Math.random() < dt * 0.6 ) S.drift = - S.drift;
-		S.balance += ( S.drift * wobble * ( 0.6 + Math.abs( S.balance ) ) + steer * GRIND.counter ) * dt; // A pushes the needle left, D right
+		// balance: drifts one way (now and then the other), easing in over the first second; A/D push the
+		// needle left/right. Steady over time, so a long grind is a reward, not a trap
+		const wobble = GRIND.wobble * Math.min( 1, S.time / GRIND.easeIn );
+		if ( Math.random() < dt * GRIND.flips ) S.drift = - S.drift;
+		S.balance += ( S.drift * wobble * ( 1 + GRIND.lean * Math.abs( S.balance ) ) + steer * GRIND.counter ) * dt;
 
 		// slide along the polyline
 		let dist = S.speed * dt;
