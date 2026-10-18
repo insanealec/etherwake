@@ -477,6 +477,7 @@ export class Galleon {
 
 			}
 			g.add( new THREE.Mesh( new THREE.TubeGeometry( new THREE.CatmullRomCurve3( pts ), 120, 0.07, 6 ), brass ) );
+			( this.grindRails ||= [] ).push( pts ); // grindable (game/Grinds.js)
 
 		}
 

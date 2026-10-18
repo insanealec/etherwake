@@ -102,6 +102,13 @@ export class Combo {
 
 	}
 
+	// hold the combo open (grinding: like being airborne)
+	hold() {
+
+		if ( this.active ) this.linkLeft = Infinity;
+
+	}
+
 	// keep the combo alive this frame (riding a bow wave or a flare-front: the astral manual)
 	sustain() {
 

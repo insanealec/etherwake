@@ -112,6 +112,13 @@ export class Surfer {
 			if ( this.wipeout <= 0 ) this.recover();
 
 		}
+		// on a rail, game/Grinds.js moves the board; only the model updates here
+		if ( this.grinding ) {
+
+			this.updateModel( dt, controls );
+			return;
+
+		}
 		this.tricks( dt, controls );
 		const n = Math.max( 1, Math.ceil( dt / STEP - 1e-6 ) );
 		const h = dt / n;

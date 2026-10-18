@@ -40,6 +40,9 @@
 		#combo.sketchy .total { color: #ffb0a0; }
 		#combo.banked .total { color: #bff4ee; text-shadow: 0 0 14px #1a8f8a, 0 2px 3px #000; }
 		#combo.bail .total { color: #ff8a7a; text-shadow: 0 0 12px #c0402a, 0 2px 3px #000; }
+		#balance { position: fixed; left: 50%; bottom: 200px; width: 220px; height: 10px; margin-left: -110px; border: 1px solid rgba( 255, 208, 138, .6 ); border-radius: 5px; background: linear-gradient( to right, rgba( 255, 90, 70, .5 ), rgba( 255, 208, 138, .15 ) 30%, rgba( 255, 208, 138, .15 ) 70%, rgba( 255, 90, 70, .5 ) ); opacity: 0; transition: opacity .2s; pointer-events: none; }
+		#balance.on { opacity: 1; }
+		#balance i { position: absolute; top: -4px; left: 50%; width: 4px; height: 18px; margin-left: -2px; background: #ffd08a; box-shadow: 0 0 6px #ff7a3a; }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
 		#title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 16px; background: radial-gradient( ellipse at 50% 45%, rgba( 10, 4, 24, .15 ), rgba( 5, 3, 13, .7 ) ); cursor: pointer; transition: opacity .9s; z-index: 10; }
 		#title.closing { opacity: 0; pointer-events: none; }
@@ -59,6 +62,7 @@
 	<div id="seamap"><canvas></canvas></div>
 	<div id="toast"></div>
 	<div id="combo"></div>
+	<div id="balance"><i></i></div>
 	<div id="prompt"></div>
 	<div id="dialogue"><div class="name"></div><div class="text"></div><div class="choices"></div></div>
 	<div id="objective"><svg class="arrow" viewBox="-12 -16 24 32" aria-hidden="true"><path d="M0 -15 L10 9 L0 3 L-10 9 Z" /></svg><span class="label"></span></div>

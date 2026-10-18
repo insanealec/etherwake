@@ -47,7 +47,8 @@ import { WhaleSong } from './audio/WhaleSong.js';
 import { Courier } from './game/Courier.js';
 import { Race } from './game/Race.js';
 import { COURSES, RACE } from './game/Races.js';
-import { UPGRADES, DEEDS, applyUpgrades, tierName } from './game/Gear.js';
+import { UPGRADES, DEEDS, applyUpgrades, tierName, BOARD } from './game/Gear.js';
+import { Grinds, GRIND } from './game/Grinds.js';
 import { SPAWN, OUTPOST, FROSTWATER, HORIZON, REGIONS, HARBOR } from './world/WorldLayout.js';
 import { WIND } from './world/Wind.js';
 import { Spray } from './player/Spray.js';
@@ -157,6 +158,8 @@ export class App {
 		this.stardust = new Stardust( this.scene, this.sea );
 		this.leviathans = new Leviathans( this.scene, this.sea );
 		this.galleon = new Galleon( this.scene, this.sea, this.save.data.galleon );
+		this.grinds = new Grinds( this.scene, this.galleon );
+		this.balanceEl = document.getElementById( 'balance' );
 		this.regions = new Regions( this.scene, this.sea );
 		this.regions.onSunstone = ( pos ) => this.onSunstone( pos );
 		this.outposts = [
@@ -308,7 +311,7 @@ export class App {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
 			helm: 'A/D steer · W more sail · S less sail · E leave the helm · F fly · M mute · H tweaks',
-			surf: `A/D carve · W sail · S brake · Space jump · J+dir flip · K+dir grab · R reset · F fly · Tab map${ this.save.data.ownsGalleon ? ' · G galleon' : '' } · M mute · H tweaks`
+			surf: `A/D carve · W sail · S brake · Space jump · J+dir flip · K+dir grab · L grind · R reset · F fly · Tab map${ this.save.data.ownsGalleon ? ' · G galleon' : '' } · M mute · H tweaks`
 		}[ mode ];
 
 	}
@@ -360,6 +363,7 @@ export class App {
 			if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
 			if ( surf && input.wasPressed( 'KeyG' ) ) this.summonGalleon();
 			if ( this.dialogue.active ) this.surfer.velocity.multiplyScalar( Math.exp( - 2 * dt ) ); // hold still while talking
+			if ( surf && ! this.dialogue.active ) this.updateGrind( dt, input, key );
 			this.surfer.update( dt, surf && ! this.dialogue.active ? {
 				steer: key( 'KeyD' ) - key( 'KeyA' ),
 				throttle: key( 'KeyW' ) - key( 'KeyS' ),
@@ -367,10 +371,14 @@ export class App {
 				flip: input.wasPressed( 'KeyJ' ) ? trickDir() : null,
 				grab: input.down( 'KeyK' ) ? trickDir() : null
 			} : {} );
-			this.port.collide( this.surfer );
-			this.leviathans.collide( this.surfer );
-			this.galleon.collide( this.surfer );
-			for ( const o of this.outposts ) o.collide( this.surfer );
+			if ( ! this.surfer.grinding ) {
+
+				this.port.collide( this.surfer );
+				this.leviathans.collide( this.surfer );
+				this.galleon.collide( this.surfer );
+				for ( const o of this.outposts ) o.collide( this.surfer );
+
+			}
 			// the Rim: a swirling current carries you round, and the air is light
 			const sp = this.surfer.position;
 			this.surfer.velocity.addScaledVector( this.rim.current( sp.x, sp.z, this._current || ( this._current = new THREE.Vector3() ) ), dt );
@@ -972,6 +980,51 @@ export class App {
 		if ( r.spin >= 180 ) this.save.stat( 'tricks', ( n ) => n + 1 );
 		this.save.stat( 'bestAir', ( b ) => Math.max( b, +r.air.toFixed( 2 ) ) );
 		this.showCombo( r.kind === 'sketchy' && this.combo.active ? 'sketchy' : null );
+
+	}
+
+	// grinds (game/Grinds.js): hold L in the air near a rail to lock on; A/D balance; Space pops off
+	updateGrind( dt, input, key ) {
+
+		const s = this.surfer, G = this.grinds;
+		if ( ! G.state && input.down( 'KeyL' ) && G.tryStart( s ) ) {
+
+			s.grinding = true;
+			this.combo.hold();
+
+		}
+		if ( G.state ) {
+
+			const r = G.update( dt, s, key( 'KeyD' ) - key( 'KeyA' ), input.wasPressed( 'Space' ) );
+			if ( r ) {
+
+				s.grinding = false;
+				s.grounded = false;
+				s.takeOff();
+				if ( r.end === 'bail' ) {
+
+					s.wipeout = BOARD.wipeoutTime;
+					const lost = this.combo.land( { kind: 'wipeout' } );
+					this.showCombo( lost ? 'bail' : null );
+					this.toast( 'Bail! Off the rail' );
+
+				} else {
+
+					this.combo.add( `${ r.name } Grind`, GRIND.points + r.time * GRIND.perSecond );
+					this.showCombo();
+
+				}
+
+			}
+
+		}
+		// the balance meter while grinding
+		if ( this.balanceEl ) {
+
+			this.balanceEl.className = G.state ? 'on' : '';
+			if ( G.state ) this.balanceEl.firstElementChild.style.left = `${ ( 50 + Math.max( - 1, Math.min( 1, G.balance ) ) * 50 ).toFixed( 1 ) }%`;
+
+		}
 
 	}
 
