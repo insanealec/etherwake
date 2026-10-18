@@ -437,10 +437,37 @@
   pale peach). **Testing gotcha:** when the browser pane is hidden, rAF stops; drive frames manually with
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
+- **Graphics pass 3, slice 6: CC0 assets (2026-10-06, in progress).** Poly Haven assets in
+  `public/assets/` (credited in CREDITS.md): weathered_brown_planks, dark_wooden_planks, rough_linen
+  (normal + ARM), Lantern_01 glTF. `world/Assets.js` loads them before the world is built (`loadAssets`,
+  `applyWood`, `lantern()`), falling back to the procedural look. Wired: galleon hull planks + normal,
+  deck, lanterns; port boardwalk (world-mapped) + 24 brass lanterns; the board's deck; linen weave on the
+  rider's sail; sky reflections (`App.buildEnvironment`: the sky background in a 256 cube map as
+  `scene.environment`, intensity 0.8, `?noReflections`). **Not yet checked visually or for cost**
+  (816k lantern triangles at the harbour): screenshot, tune scales/tints/lantern sizes, measure.
+- **Tricks, slice 1: combos (2026-10-17).** `game/Tricks.js`: `FLIPS` (J + direction: Barrel Roll,
+  Front Flip, Backflip, Corkscrew, Comet Roll; the whole rig rotates about its middle and must finish
+  before landing or it's a bail), `GRABS` (K + direction held: Melon, Nosegrab, Tailgrab, Indy, Method;
+  points grow while held, still holding at landing = sketchy), `TRICK` tuning, and `Combo`: score = sum x
+  trick count, repeats worth half each time, spins / revert / hangtime added on landing, a 2.2 s link
+  after landing (a bow wave or flare-front sustains it), bail loses it, banking pays score / 20 credits
+  and records `bestCombo`. Surfer: `tricks()`, `releaseGrab()`, `onTrick`, flip/grab poses. App:
+  `trickDir()`, `updateCombo()`, `showCombo()` (`#combo` readout: chain, score x multiplier, link bar).
+  The old per-landing payout (`trickPayout`) is no longer used.
+- **Tricks, slice 2: grinds (2026-10-17).** `game/Grinds.js`: hold L in the air near a rail (within
+  1.8 m sideways, 1.8 m above / 0.9 m below, moving along it) to lock on; the board slides along the
+  polyline (friction 4%/s, min 5 m/s); a balance meter drifts (harder the longer you grind), A/D push
+  the needle left/right, past the edge = bail; Space pops off (combo continues), a rail's end launches
+  you. Points 100 + 140/s as "<rail> Grind". Rails: `RAIL_PARK` (4 floating brass rails east of the
+  harbour, inside the calm zone), the boardwalk railing (a loop), the galleon's cap rails
+  (`Galleon.grindRails`, moving with the ship). Surfer.grinding skips physics; collisions skipped while
+  grinding; `Combo.hold()`; HUD `#balance`. Not yet: whale-spine / ice-ridge rails, grind variations,
+  sparks.
+
 ## Next up
 **Tricks, THPS on the astral sea** (user, 2026-10-17: "deeper tricks, like Tony Hawk's Pro Skater").
 1. ✅ Trick combos (below).
-2. **Grinds:** rails to grind (galleon cap rails, the boardwalk railing, whale spines, ice shard ridges)
+2. ✅ **Grinds:** rails to grind (galleon cap rails, the boardwalk railing, whale spines, ice shard ridges)
    with a balance meter; grinds join combos.
 3. **Special meter and goals:** a special meter filled by tricks, special tricks when it's full, and
    goals: S-O-L-A-R letters to collect, high-score runs, trick challenges at the harbour.
