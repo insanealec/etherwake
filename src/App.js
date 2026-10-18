@@ -34,7 +34,8 @@ import { Rings } from './world/Rings.js';
 import { Rim, uLens } from './world/Rim.js';
 import { RIM } from './game/Rim.js';
 import { Save } from './game/Save.js';
-import { REWARDS, trickPayout } from './game/Rewards.js';
+import { REWARDS } from './game/Rewards.js';
+import { Combo, TRICK } from './game/Tricks.js';
 import { Stardust } from './world/Stardust.js';
 import { Leviathans } from './world/Leviathans.js';
 import { Galleon, HELM_SPOT } from './world/Galleon.js';
@@ -136,6 +137,15 @@ export class App {
 		this.spray = new Spray( this.scene );
 		this.chase = new ChaseCamera( this.camera, this.sea, this.cameraClearance ? { clearance: this.cameraClearance } : {} );
 		this.surfer.onLand = ( r ) => this.onLand( r );
+		// tricks chain into combos (game/Tricks.js)
+		this.combo = new Combo();
+		this.comboEl = document.getElementById( 'combo' );
+		this.surfer.onTrick = ( name, points ) => {
+
+			this.combo.add( name, points );
+			this.showCombo();
+
+		};
 		this.chase.snap( this.surfer );
 		this.walker = new Walker( this.scene );
 		this.walkCam = new WalkCamera( this.camera, this.input, this.port.cameraObstacles );
@@ -298,7 +308,7 @@ export class App {
 			fly: 'FLY · click to look · WASD · Space/C up/down · Shift fast · F back · H tweaks',
 			walk: 'WASD walk · Shift run · mouse or ←/→ camera · E interact · F fly · H tweaks',
 			helm: 'A/D steer · W more sail · S less sail · E leave the helm · F fly · M mute · H tweaks',
-			surf: `A/D carve · W sail · S brake · Space jump · R reset · F fly · Tab map${ this.save.data.ownsGalleon ? ' · G galleon' : '' } · M mute · H tweaks`
+			surf: `A/D carve · W sail · S brake · Space jump · J+dir flip · K+dir grab · R reset · F fly · Tab map${ this.save.data.ownsGalleon ? ' · G galleon' : '' } · M mute · H tweaks`
 		}[ mode ];
 
 	}
@@ -340,6 +350,8 @@ export class App {
 
 		const surf = this.mode === 'surf', walk = this.mode === 'walk';
 		const key = ( c ) => input.down( c ) ? 1 : 0;
+		// the direction held for a trick (game/Tricks.js tables are keyed by it)
+		const trickDir = () => input.down( 'KeyW' ) ? 'W' : input.down( 'KeyS' ) ? 'S' : input.down( 'KeyA' ) ? 'A' : input.down( 'KeyD' ) ? 'D' : 'none';
 
 		// board: ridden, or parked in its slip while on foot
 		if ( this.onFoot ) this.surfer.park( dt );
@@ -351,7 +363,9 @@ export class App {
 			this.surfer.update( dt, surf && ! this.dialogue.active ? {
 				steer: key( 'KeyD' ) - key( 'KeyA' ),
 				throttle: key( 'KeyW' ) - key( 'KeyS' ),
-				jump: input.wasPressed( 'Space' )
+				jump: input.wasPressed( 'Space' ),
+				flip: input.wasPressed( 'KeyJ' ) ? trickDir() : null,
+				grab: input.down( 'KeyK' ) ? trickDir() : null
 			} : {} );
 			this.port.collide( this.surfer );
 			this.leviathans.collide( this.surfer );
@@ -363,6 +377,7 @@ export class App {
 			this.surfer.gravityScale = this.rim.gravityAt( sp.x, sp.z );
 			this.rideBowWave( dt );
 			this.rideFlare( dt );
+			this.updateCombo( dt );
 
 		}
 
@@ -947,18 +962,62 @@ export class App {
 
 		this.chase.land( r.impact );
 		this.spray.burst( this.surfer, Math.min( 40, 6 + r.impact * 3 ) | 0 );
-		if ( r.kind === 'wipeout' ) return this.toast( 'Wipeout!' );
-		const pay = this.earn( trickPayout( r ) );
+		const lost = this.combo.land( r );
+		if ( r.kind === 'wipeout' ) {
+
+			this.showCombo( lost ? 'bail' : null );
+			return this.toast( r.bail === 'flip' ? 'Bail! Landed mid-flip' : 'Wipeout!' );
+
+		}
 		if ( r.spin >= 180 ) this.save.stat( 'tricks', ( n ) => n + 1 );
 		this.save.stat( 'bestAir', ( b ) => Math.max( b, +r.air.toFixed( 2 ) ) );
-		const parts = [];
-		if ( r.spin >= 180 ) parts.push( String( r.spin ) );
-		if ( r.revert ) parts.push( 'revert' );
-		if ( r.air >= 1.8 ) parts.push( `${ r.air.toFixed( 1 ) }s air` );
-		if ( r.kind === 'sketchy' ) parts.push( 'sketchy' );
-		else if ( parts.length ) parts.push( 'clean' );
-		if ( pay > 0 ) parts.push( `+${ pay } ✦${ this.reachTag }` );
-		if ( parts.length ) this.toast( parts.join( ' · ' ) );
+		this.showCombo( r.kind === 'sketchy' && this.combo.active ? 'sketchy' : null );
+
+	}
+
+	// per frame: the combo banks when its link runs out (riding a bow wave or flare-front keeps it going)
+	updateCombo( dt ) {
+
+		if ( this.bowGrace > 0 || this.flareGrace > 0 ) this.combo.sustain();
+		const wasLive = this.combo.active;
+		const banked = this.combo.update( dt, this.surfer.grounded );
+		if ( banked > 0 ) {
+
+			const got = this.earn( Math.max( 1, Math.round( banked / TRICK.creditsPer ) ) );
+			this.save.stat( 'bestCombo', ( b ) => Math.max( b || 0, banked ) );
+			this.showCombo( 'banked', banked, got );
+
+		} else if ( wasLive && this.combo.active ) this.showCombo();
+
+	}
+
+	// the THPS-style combo readout: the trick chain, then the score x multiplier
+	showCombo( state = null, banked = 0, credits = 0 ) {
+
+		const el = this.comboEl, c = this.combo;
+		if ( ! el ) return;
+		clearTimeout( this.comboFade );
+		if ( state === 'bail' ) {
+
+			el.className = 'bail';
+			el.innerHTML = '<div class="total">Bail!</div>';
+
+		} else if ( state === 'banked' ) {
+
+			el.className = 'banked';
+			el.innerHTML = `<div class="total">${ banked.toLocaleString() }</div><div class="chain">+${ credits } ✦${ this.reachTag }</div>`;
+
+		} else if ( c.active ) {
+
+			const link = c.linkLeft === Infinity ? 1 : Math.max( 0, c.linkLeft / TRICK.link );
+			el.className = 'live' + ( state === 'sketchy' ? ' sketchy' : '' );
+			el.innerHTML = `<div class="chain">${ c.tricks.map( ( t ) => t.name ).join( ' + ' ) }</div>`
+				+ `<div class="total">${ Math.round( c.base ).toLocaleString() } <span>× ${ c.multiplier }</span></div>`
+				+ `<div class="link"><i style="width:${ ( link * 100 ).toFixed( 0 ) }%"></i></div>`;
+			return;
+
+		} else return;
+		this.comboFade = setTimeout( () => ( el.className = '' ), 1800 );
 
 	}
 

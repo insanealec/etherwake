@@ -30,6 +30,16 @@
 		#compass .marker { position: absolute; left: 50%; top: 3px; font-size: 13px; white-space: nowrap; text-shadow: 0 1px 2px #000; }
 		#seamap { position: fixed; left: 50%; top: 50%; transform: translate( -50%, -50% ) scale( .96 ); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 		#seamap.open { opacity: 1; transform: translate( -50%, -50% ) scale( 1 ); }
+		#combo { position: fixed; left: 0; right: 0; bottom: 96px; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 0 10px #ff7a3a, 0 2px 3px #000; }
+		#combo.live, #combo.banked, #combo.bail { opacity: 1; }
+		#combo .chain { font-size: 16px; color: #ffe2b0; letter-spacing: .03em; max-width: 80%; margin: 0 auto; }
+		#combo .total { font-size: 34px; color: #ffd08a; }
+		#combo .total span { font-size: 22px; color: #bff4ee; text-shadow: 0 0 10px #1a8f8a, 0 2px 3px #000; }
+		#combo .link { width: 160px; height: 3px; margin: 4px auto 0; background: rgba( 255, 255, 255, .15 ); }
+		#combo .link i { display: block; height: 100%; background: #ffd08a; }
+		#combo.sketchy .total { color: #ffb0a0; }
+		#combo.banked .total { color: #bff4ee; text-shadow: 0 0 14px #1a8f8a, 0 2px 3px #000; }
+		#combo.bail .total { color: #ff8a7a; text-shadow: 0 0 12px #c0402a, 0 2px 3px #000; }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
 		#title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 16px; background: radial-gradient( ellipse at 50% 45%, rgba( 10, 4, 24, .15 ), rgba( 5, 3, 13, .7 ) ); cursor: pointer; transition: opacity .9s; z-index: 10; }
 		#title.closing { opacity: 0; pointer-events: none; }
@@ -40,7 +50,7 @@
 		#title .keys { position: absolute; bottom: 22px; left: 16px; right: 16px; font-size: 13px; color: rgba( 243, 230, 196, .7 ); text-shadow: 0 1px 2px #000; }
 		@keyframes breathe { 50% { text-shadow: 0 0 34px #ff9a4a, 0 0 90px rgba( 255, 140, 70, .65 ), 0 3px 4px #000; } }
 		@keyframes blink { 50% { opacity: .45; } }
-		body.on-title #hud, body.on-title #compass, body.on-title #credits, body.on-title #objective, body.on-title #prompt, body.on-title #toast { visibility: hidden; }
+		body.on-title #hud, body.on-title #compass, body.on-title #credits, body.on-title #objective, body.on-title #prompt, body.on-title #toast, body.on-title #combo { visibility: hidden; }
 	</style>
 </head>
 <body>
@@ -48,6 +58,7 @@
 	<div id="compass"></div>
 	<div id="seamap"><canvas></canvas></div>
 	<div id="toast"></div>
+	<div id="combo"></div>
 	<div id="prompt"></div>
 	<div id="dialogue"><div class="name"></div><div class="text"></div><div class="choices"></div></div>
 	<div id="objective"><svg class="arrow" viewBox="-12 -16 24 32" aria-hidden="true"><path d="M0 -15 L10 9 L0 3 L-10 9 Z" /></svg><span class="label"></span></div>

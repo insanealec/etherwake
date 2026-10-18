@@ -438,33 +438,14 @@
   `__ew.sea.update( t, __ew.camera ); __ew.renderer.render( __ew.scene, __ew.camera )`.
 
 ## Next up
-**Graphics pass 3: stretch the limits** (user, 2026-10-06: back to the original goal of pushing how good
-it can look, Tidewater-level; the foundation is in place, now upgrade). three 0.186 ships most of the
-tools as TSL nodes in `three/addons/tsl/display/` (TRAANode, TAAUNode, GTAONode, MotionBlur,
-TemporalReprojectNode, LensflareNode, SSRNode...). Slices, in order:
-1. ✅ **Temporal foundation:** a velocity MRT on the scene pass and TRAA (temporal AA). Kills shimmer on
-   rigging, rails and cloud edges; later slices accumulate over frames on top of it.
-2. ✅ **The hero: a volumetric etherium.** Raymarch the cloud sea as real 3D gas near the camera (density
-   from the swell height plus 3D noise, a few light steps toward the sun for self-shadowing, emission in
-   the palette), at reduced resolution with blue-noise jitter and temporal accumulation, composited by
-   depth. Replaces the see-through layers and the puffs; the board and the ship carve channels in it.
-3. ✅ (clouds; GTAO on the ship and port still to do) **Shadows and AO:** the rider, board and galleon shadow the clouds (shadow map read in the volume and
-   the sea shader); GTAO on the ship and port.
-4. ✅ (light shafts; the sky nebulae stay the 2D cliffs for now) **Volumetric sky nebulae** and light shafts through the cloud volume.
-5. ✅ (auto exposure; motion blur skipped: the user is sensitive to camera disorientation, and the speed
-   lines carry the speed) **Motion blur** (from the velocity MRT) and auto exposure.
-6. 🟡 (in progress, see Status) **Hero materials:** CC0 PBR textures (Poly Haven / ambientCG) for wood, brass and canvas.
-Each slice: measure the frame cost (ms) before and after, keep a URL flag to turn it off.
-
-**Slice 6 status (2026-10-06, usage limit hit mid-slice):** CC0 Poly Haven assets downloaded to
-`public/assets/` and credited in CREDITS.md (weathered_brown_planks, dark_wooden_planks, rough_linen
-normal+ARM, Lantern_01 glTF). `world/Assets.js` loads them before the world is built (`loadAssets`,
-`applyWood`, `lantern()`), with fallbacks to the procedural look. Wired: galleon hull planks + normal,
-deck, lanterns; port boardwalk (world-mapped) + 24 brass lanterns; the board's deck; linen weave on the
-rider's sail; sky reflections (`App.buildEnvironment`: the sky background in a 256 cube map as
-`scene.environment`, intensity 0.8, `?noReflections`). It loads without errors, but is **not yet checked
-visually or for cost**: next session, screenshot the galleon, harbour and board, tune texture scales
-and tints, check the lantern sizes, and measure the frame cost (816k lantern triangles at the harbour).
+**Tricks, THPS on the astral sea** (user, 2026-10-17: "deeper tricks, like Tony Hawk's Pro Skater").
+1. ✅ Trick combos (below).
+2. **Grinds:** rails to grind (galleon cap rails, the boardwalk railing, whale spines, ice shard ridges)
+   with a balance meter; grinds join combos.
+3. **Special meter and goals:** a special meter filled by tricks, special tricks when it's full, and
+   goals: S-O-L-A-R letters to collect, high-score runs, trick challenges at the harbour.
+Still open from graphics pass 3, slice 6: check the new CC0 textures and lanterns visually and for cost
+(see Status).
 
 ## Working rules (base subscription, so be economical)
 - **One milestone slice per session.** End every session with something that runs, a commit, and this

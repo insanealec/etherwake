@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { BOARD } from '../game/Gear.js';
 import { WIND, sailPower } from '../world/Wind.js';
 import { buildSurferModel } from './SurferModel.js';
+import { FLIPS, GRABS, TRICK } from '../game/Tricks.js';
 
 const STEP = 1 / 120; // physics substep (s)
 const WORLD_UP = new THREE.Vector3( 0, 1, 0 );
@@ -16,6 +17,7 @@ const _r = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
+const _w = new THREE.Vector3();
 const MAST_TOP = new THREE.Vector3( 0, 2.72, 0.35 );
 const DEG = Math.PI / 180;
 const wrap = ( a ) => Math.atan2( Math.sin( a ), Math.cos( a ) );
@@ -36,7 +38,10 @@ export class Surfer {
 		this.steer = 0; // smoothed -1..1, for lean
 		this.crouch = 0;
 		this.up = new THREE.Vector3( 0, 1, 0 ); // smoothed board up
-		this.onLand = null; // callback( { kind: 'clean' | 'sketchy' | 'wipeout', impact, spin, air, revert } )
+		this.onLand = null; // callback( { kind: 'clean' | 'sketchy' | 'wipeout', impact, spin, air, revert, bail } )
+		this.onTrick = null; // callback( name, points ) as an aerial completes or a grab is let go (game/Tricks.js)
+		this.flip = null; // { def, t } while an aerial is in progress
+		this.grab = null; // { def, t, pose } while a grab is held
 		this.airSpin = 0; // signed yaw turned since leaving the surface (rad)
 		this.airTime = 0;
 		this.wipeout = 0; // seconds of tumble left
@@ -107,6 +112,7 @@ export class Surfer {
 			if ( this.wipeout <= 0 ) this.recover();
 
 		}
+		this.tricks( dt, controls );
 		const n = Math.max( 1, Math.ceil( dt / STEP - 1e-6 ) );
 		const h = dt / n;
 		const t0 = this.sea.time - dt;
@@ -209,6 +215,41 @@ export class Surfer {
 		this.grounded = false;
 		this.airSpin = 0;
 		this.airTime = 0;
+		this.flip = null;
+		this.grab = null;
+
+	}
+
+	// aerials (controls.flip: the direction key when J is pressed) and grabs (controls.grab: the direction
+	// key while K is held), airborne only; see game/Tricks.js
+	tricks( dt, controls ) {
+
+		if ( this.grounded || this.wipeout > 0 ) return;
+		if ( this.flip ) {
+
+			this.flip.t += dt;
+			if ( this.flip.t >= this.flip.def.time ) {
+
+				this.onTrick?.( this.flip.def.name, this.flip.def.points );
+				this.flip = null;
+
+			}
+
+		} else if ( controls.flip ) this.flip = { def: FLIPS[ controls.flip ], t: 0 };
+		if ( controls.grab ) {
+
+			if ( ! this.grab ) this.grab = { def: GRABS[ controls.grab ], t: 0 };
+			else this.grab.t += dt;
+
+		} else if ( this.grab ) this.releaseGrab();
+
+	}
+
+	releaseGrab() {
+
+		const g = this.grab;
+		this.grab = null;
+		if ( g.t >= TRICK.grabMin ) this.onTrick?.( g.def.name, g.def.points + g.t * TRICK.grabPerSecond );
 
 	}
 
@@ -220,7 +261,13 @@ export class Surfer {
 		const { off, revert } = this.alignment();
 
 		const result = { impact, spin: Math.round( Math.abs( this.airSpin ) / Math.PI ) * 180, air: this.airTime, revert };
-		if ( off > B.wipeoutAngle ) {
+		// landing mid-aerial is a bail; still holding a grab lands it sketchy
+		const midFlip = !! this.flip;
+		const holding = !! this.grab;
+		this.flip = null;
+		if ( holding ) this.releaseGrab();
+		if ( midFlip ) result.bail = 'flip';
+		if ( off > B.wipeoutAngle || midFlip ) {
 
 			result.kind = 'wipeout';
 			this.wipeout = B.wipeoutTime;
@@ -228,7 +275,7 @@ export class Surfer {
 		} else {
 
 			if ( revert ) this.yaw += Math.PI;
-			result.kind = off > B.cleanAngle ? 'sketchy' : 'clean';
+			result.kind = off > B.cleanAngle || holding ? 'sketchy' : 'clean';
 			if ( result.kind === 'sketchy' ) {
 
 				v.x *= B.sketchyKeep;
@@ -276,7 +323,7 @@ export class Surfer {
 
 		const k = 1 - Math.exp( - 10 * dt );
 		this.steer += ( ( controls.steer || 0 ) - this.steer ) * k;
-		this.crouch += ( ( controls.throttle > 0 || ! this.grounded ? 1 : 0 ) - this.crouch ) * k;
+		this.crouch += ( ( controls.throttle > 0 || ! this.grounded || this.grab ? 1 : 0 ) - this.crouch ) * k;
 
 		// board up follows the surface normal while riding, drifts upright in the air
 		const target = this.grounded ? this.sea.normalAt( this.position.x, this.position.z, this.sea.time, _n ) : WORLD_UP;
@@ -294,6 +341,22 @@ export class Surfer {
 		const tumble = this.wipeout > 0 ? Math.min( 1, ( BOARD.wipeoutTime - this.wipeout ) / 0.3 ) : 0;
 		this.object.quaternion.multiply( _q.setFromAxisAngle( _f.set( 0, 0, 1 ), lean + tumble * 1.3 ) );
 		this.object.position.copy( this.position );
+
+		// tricks: an aerial turns the whole rig about its middle (1 m up), a grab tips the board
+		_w.set( 0, 1, 0 ).applyQuaternion( this.object.quaternion ); // the pivot before
+		if ( this.flip ) {
+
+			const f = this.flip, k = Math.min( 1, f.t / f.def.time ), e = k * k * ( 3 - 2 * k );
+			const axis = f.def.axis === 'roll' ? _f.set( 0, 0, 1 ) : _f.set( 1, 0, 0 );
+			this.object.quaternion.multiply( _q.setFromAxisAngle( axis, e * f.def.turns * Math.PI * 2 ) );
+
+		}
+		const g = this.grab?.def, kg = 1 - Math.exp( - 12 * dt );
+		this.grabPitch = ( this.grabPitch || 0 ) + ( ( g ? g.pitch : 0 ) - ( this.grabPitch || 0 ) ) * kg;
+		this.grabRoll = ( this.grabRoll || 0 ) + ( ( g ? g.roll : 0 ) - ( this.grabRoll || 0 ) ) * kg;
+		this.object.quaternion.multiply( _q.setFromAxisAngle( _f.set( 1, 0, 0 ), - this.grabPitch ) );
+		this.object.quaternion.multiply( _q.setFromAxisAngle( _f.set( 0, 0, 1 ), this.grabRoll ) );
+		this.object.position.add( _w ).sub( _f.set( 0, 1, 0 ).applyQuaternion( this.object.quaternion ) );
 
 
 		// boom swings out to the downwind side: square when running, close in when reaching upwind

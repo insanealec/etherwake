@@ -20,7 +20,7 @@ export class Title {
 			<div class="tag">surf the glowing etherium between the stars</div>
 			<div class="go">${ fresh ? 'Click to set sail' : 'Click to continue your voyage' }</div>
 			${ fresh ? '' : `<div class="voyage">✦ ${ save.credits || 0 } credits${ save.ownsGalleon ? ' · the galleon is yours' : '' }</div>` }
-			<div class="keys">A/D carve · W sail · S brake · Space jump · E dock and talk · Tab sea chart · M mute</div>`;
+			<div class="keys">A/D carve · W sail · S brake · Space jump · J flip · K grab · E dock and talk · Tab sea chart · M mute</div>`;
 		document.body.appendChild( el );
 		document.body.classList.add( 'on-title' );
 
