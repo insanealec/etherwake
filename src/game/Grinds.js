@@ -11,6 +11,8 @@ export const GRIND = {
 	minSpeed: 5, // m/s along the rail to lock on (and the slowest you'll slide)
 	friction: 0.04, // speed lost per second (fraction)
 	points: 100, perSecond: 140,
+	minTime: 0.2, // seconds on a rail for the grind to count as a trick
+	cooldown: 0.8, // seconds before you can lock onto the rail you just left
 	wobble: 0.75, // how hard the balance drifts (steady: long grinds shouldn't get harder)
 	easeIn: 1.0, // seconds for the wobble to ease in at the start (time to settle onto the rail)
 	lean: 0.35, // extra drift the further the needle already leans (keep small, or it runs away)
@@ -144,15 +146,20 @@ export class Grinds {
 	tryStart( surfer ) {
 
 		if ( this.state || surfer.grounded || surfer.wipeout > 0 ) return false;
-		const p = surfer.position, v = surfer.velocity;
+		const p = surfer.position, v = surfer.velocity, now = performance.now() / 1000;
 		for ( const rail of this.railsNow() ) {
 
+			// not straight back onto the rail you just left (that looped at a rail's end)
+			if ( rail.name === this.lastRail && now - this.lastEnd < GRIND.cooldown ) continue;
 			const c = this.closest( rail, p );
 			if ( c.dist > GRIND.capture || c.dy > GRIND.above || c.dy < - GRIND.below ) continue;
 			_d.subVectors( rail.pts[ c.seg + 1 ], rail.pts[ c.seg ] ).normalize();
 			const along = v.x * _d.x + v.z * _d.z;
 			const horiz = Math.hypot( v.x, v.z );
 			if ( horiz < GRIND.minSpeed * 0.6 || Math.abs( along ) < horiz * 0.35 ) continue;
+			// nor at an end you're heading off
+			const n = rail.pts.length - 1;
+			if ( ! rail.loop && ( ( c.seg === n - 1 && c.u > 0.97 && along > 0 ) || ( c.seg === 0 && c.u < 0.03 && along < 0 ) ) ) continue;
 			this.state = {
 				rail, seg: c.seg, u: c.u, dir: Math.sign( along ) || 1, speed: Math.max( GRIND.minSpeed, Math.abs( along ) ),
 				time: 0, balance: 0, drift: ( Math.random() < 0.5 ? - 1 : 1 )
@@ -231,6 +238,8 @@ export class Grinds {
 		else if ( ended ) end = 'end';
 		if ( ! end ) return null;
 		this.state = null;
+		this.lastRail = S.rail.name;
+		this.lastEnd = performance.now() / 1000;
 		if ( end === 'jump' ) surfer.velocity.y = GRIND.pop;
 		else if ( end === 'end' ) surfer.velocity.y += GRIND.endPop;
 		else {

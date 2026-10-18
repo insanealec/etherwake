@@ -987,7 +987,9 @@ export class App {
 	updateGrind( dt, input, key ) {
 
 		const s = this.surfer, G = this.grinds;
-		if ( ! G.state && input.down( 'KeyL' ) && G.tryStart( s ) ) {
+		// L must be let go between grinds (holding it re-locked at a rail's end, over and over)
+		if ( ! input.down( 'KeyL' ) ) this.grindLatch = false;
+		if ( ! G.state && ! this.grindLatch && input.down( 'KeyL' ) && G.tryStart( s ) ) {
 
 			s.grinding = true;
 			this.combo.hold();
@@ -1000,6 +1002,7 @@ export class App {
 
 				s.grinding = false;
 				s.grounded = false;
+				this.grindLatch = true;
 				s.takeOff();
 				if ( r.end === 'bail' ) {
 
@@ -1008,7 +1011,7 @@ export class App {
 					this.showCombo( lost ? 'bail' : null );
 					this.toast( 'Bail! Off the rail' );
 
-				} else {
+				} else if ( r.time >= GRIND.minTime ) {
 
 					this.combo.add( `${ r.name } Grind`, GRIND.points + r.time * GRIND.perSecond );
 					this.showCombo();
@@ -1064,7 +1067,9 @@ export class App {
 
 			const link = c.linkLeft === Infinity ? 1 : Math.max( 0, c.linkLeft / TRICK.link );
 			el.className = 'live' + ( state === 'sketchy' ? ' sketchy' : '' );
-			el.innerHTML = `<div class="chain">${ c.tricks.map( ( t ) => t.name ).join( ' + ' ) }</div>`
+			// the latest tricks only (a long chain would fill the screen)
+			const shown = c.tricks.slice( - 6 ).map( ( t ) => t.name ).join( ' + ' );
+			el.innerHTML = `<div class="chain">${ c.tricks.length > 6 ? '… + ' : '' }${ shown }</div>`
 				+ `<div class="total">${ Math.round( c.base ).toLocaleString() } <span>× ${ c.multiplier }</span></div>`
 				+ `<div class="link"><i style="width:${ ( link * 100 ).toFixed( 0 ) }%"></i></div>`;
 			return;

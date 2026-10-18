@@ -462,7 +462,10 @@
   you. Points 100 + 140/s as "<rail> Grind". Rails: `RAIL_PARK` (4 floating brass rails east of the
   harbour, inside the calm zone), the boardwalk railing (a loop), the galleon's cap rails
   (`Galleon.grindRails`, moving with the ship). Surfer.grinding skips physics; collisions skipped while
-  grinding; `Combo.hold()`; HUD `#balance`. Not yet: whale-spine / ice-ridge rails, grind variations,
+  grinding; `Combo.hold()`; HUD `#balance`. Re-lock guards (a rail's end used to re-lock every frame while L
+  was held: a ×23 combo of the same grind): L must be released between grinds, an 0.8 s cooldown on the
+  rail just left, no lock-on at an end you're heading off, grinds under 0.2 s don't count; the combo
+  readout shows the last 6 tricks. Not yet: whale-spine / ice-ridge rails, grind variations,
   sparks.
 
 ## Next up
