@@ -1,0 +1,11 @@
+// Cloudflare Worker serving the static build (no Worker script: assets only).
+// Build first (`npm run build` writes dist/), then `npx wrangler deploy`, or `npm run deploy` for both.
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "etherwake",
+	"compatibility_date": "2026-10-20",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "single-page-application"
+	}
+}
