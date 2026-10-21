@@ -5,7 +5,11 @@
 // with small ones for the sea chart (Tab), the galleon (G) and mute (M). Dialogue choices become tappable.
 // The first touch asks for fullscreen and a landscape lock (where the browser allows).
 export const TOUCH = {
-	deadZone: 0.3, // of the stick's reach, before a direction counts
+	deadZone: 0.3, // of the stick's reach, before W/S (and trick directions) count
+	sideKeys: 0.6, // sideways deflection that counts as A/D (trick directions, walking)
+	steerDead: 0.1, // analog steering: no turn inside this
+	steerCurve: 1.8, // > 1: small movements turn gently, full deflection still turns fully
+	steerMax: 0.9, // the hardest carve the stick gives (keyboard A/D is 1)
 	reach: 60 // px from the stick's centre to full deflection
 };
 
@@ -94,6 +98,7 @@ export class Touch {
 			if ( e.pointerId !== this.stickId ) return;
 			this.stickId = null;
 			this.stick.classList.remove( 'on' );
+			input.stick = null;
 			for ( const k of [ 'KeyW', 'KeyA', 'KeyS', 'KeyD' ] ) input.keys.delete( k );
 
 		};
@@ -124,8 +129,12 @@ export class Touch {
 		}
 		this.knob.style.transform = `translate( ${ dx * T.reach }px, ${ dy * T.reach }px )`;
 		const set = ( code, on ) => on ? this.input.keys.add( code ) : this.input.keys.delete( code );
-		set( 'KeyA', dx < - T.deadZone );
-		set( 'KeyD', dx > T.deadZone );
+		// steering is analog (input.stick.x): a curve past a small dead zone, so a slight thumb movement
+		// carves gently; A/D only for a clear push (trick directions, walking)
+		const ax = Math.max( 0, Math.abs( dx ) - T.steerDead ) / ( 1 - T.steerDead );
+		this.input.stick = { x: Math.sign( dx ) * Math.pow( ax, T.steerCurve ) * T.steerMax, y: dy };
+		set( 'KeyA', dx < - T.sideKeys );
+		set( 'KeyD', dx > T.sideKeys );
 		set( 'KeyW', dy < - T.deadZone );
 		set( 'KeyS', dy > T.deadZone );
 

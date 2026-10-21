@@ -7,6 +7,7 @@ export class Input {
 		this.element = element;
 		this.keys = new Set();
 		this.pressed = new Set(); // keys that went down this frame
+		this.stick = null; // { x, y } -1..1 while the touch stick is held (ui/Touch.js); x is analog steering
 		this.mouseDX = 0;
 		this.mouseDY = 0;
 

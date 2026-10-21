@@ -372,6 +372,8 @@ export class App {
 
 		const surf = this.mode === 'surf', walk = this.mode === 'walk';
 		const key = ( c ) => input.down( c ) ? 1 : 0;
+		// steering: the touch stick's analog x when it's held (ui/Touch.js), else A/D
+		const steer = () => input.stick ? input.stick.x : key( 'KeyD' ) - key( 'KeyA' );
 		// the direction held for a trick (game/Tricks.js tables are keyed by it)
 		const trickDir = () => input.down( 'KeyW' ) ? 'W' : input.down( 'KeyS' ) ? 'S' : input.down( 'KeyA' ) ? 'A' : input.down( 'KeyD' ) ? 'D' : 'none';
 
@@ -382,9 +384,9 @@ export class App {
 			if ( surf && input.wasPressed( 'KeyR' ) ) this.surfer.reset( this.surfer.position.x, this.surfer.position.z );
 			if ( surf && input.wasPressed( 'KeyG' ) ) this.summonGalleon();
 			if ( this.dialogue.active ) this.surfer.velocity.multiplyScalar( Math.exp( - 2 * dt ) ); // hold still while talking
-			if ( surf && ! this.dialogue.active ) this.updateGrind( dt, input, key );
+			if ( surf && ! this.dialogue.active ) this.updateGrind( dt, input, key, steer );
 			this.surfer.update( dt, surf && ! this.dialogue.active ? {
-				steer: key( 'KeyD' ) - key( 'KeyA' ),
+				steer: steer(),
 				throttle: key( 'KeyW' ) - key( 'KeyS' ),
 				jump: input.wasPressed( 'Space' ),
 				flip: input.wasPressed( 'KeyJ' ) ? trickDir() : null,
@@ -421,7 +423,7 @@ export class App {
 		for ( const o of this.outposts ) o.update( dt );
 		this.rings.update( dt, this.onFoot ? null : this.surfer );
 		this.rim.update( dt, this.camera, this.onFoot ? null : this.surfer );
-		this.galleon.update( dt, helm ? { steer: key( 'KeyD' ) - key( 'KeyA' ), sail: key( 'KeyW' ) - key( 'KeyS' ) } : null );
+		this.galleon.update( dt, helm ? { steer: steer(), sail: key( 'KeyW' ) - key( 'KeyS' ) } : null );
 		if ( this.mode === 'helm' && this.time > ( this.poseSavedAt || 0 ) + 5 ) this.saveShipPose();
 		if ( this.onFoot ) this.walker.sync(); // the deck may have moved under you
 		this.song.update( dt, this.camera.position );
@@ -1015,7 +1017,7 @@ export class App {
 	}
 
 	// grinds (game/Grinds.js): hold L in the air near a rail to lock on; A/D balance; Space pops off
-	updateGrind( dt, input, key ) {
+	updateGrind( dt, input, key, steer ) {
 
 		const s = this.surfer, G = this.grinds;
 		// L must be let go between grinds (holding it re-locked at a rail's end, over and over)
@@ -1028,7 +1030,7 @@ export class App {
 		}
 		if ( G.state ) {
 
-			const r = G.update( dt, s, key( 'KeyD' ) - key( 'KeyA' ), input.wasPressed( 'Space' ) );
+			const r = G.update( dt, s, steer(), input.wasPressed( 'Space' ) );
 			if ( r ) {
 
 				s.grinding = false;

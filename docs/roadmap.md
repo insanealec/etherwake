@@ -482,7 +482,8 @@
   (timestamp queries) is wired into `?stats` but only covers some passes: not reliable yet. Next: touch
   controls, then check on the phone with `?stats`.
 - **Mobile, slice 2: touch controls (2026-10-21).** `ui/Touch.js` (phones/tablets, or `?touch`): a
-  floating thumb stick on the left half (W/A/S/D with a 0.3 dead zone: carve and sail, walking, trick
+  floating thumb stick on the left half (analog steering via `input.stick.x`: 0.1 dead zone, curve 1.8,
+  max 0.9, after the user found slight turns too sharp; W/S past 0.3, A/D past 0.6 for walking and trick
   direction) and buttons on the right (Jump, Flip, Grab, Grind, Act = Space/J/K/L/E; Map, Ship, Mute =
   Tab/G/mute callback); they set the same Input key states as the keyboard. Dialogue choices are separate
   `[data-key]` spans and tappable; tapping the box advances. First touch requests fullscreen + landscape.
