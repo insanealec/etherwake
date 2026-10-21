@@ -9,7 +9,8 @@ export const ASSETS = { textures: {}, lantern: null };
 
 const BASE = import.meta.env.BASE_URL + 'assets/';
 
-export async function loadAssets() {
+// lantern: false skips the lantern model (low quality: the lanterns are just glows)
+export async function loadAssets( { lantern = true } = {} ) {
 
 	const loader = new THREE.TextureLoader();
 	const load = ( file, srgb = false ) => loader.loadAsync( BASE + 'textures/' + file ).then( ( t ) => {
@@ -29,7 +30,7 @@ export async function loadAssets() {
 	}
 	jobs.push( Promise.all( [ load( 'rough_linen_nor_gl_1k.jpg' ), load( 'rough_linen_arm_1k.jpg' ) ] )
 		.then( ( [ nor, arm ] ) => ( ASSETS.textures.linen = { nor, arm } ) ) );
-	jobs.push( new GLTFLoader().loadAsync( BASE + 'models/lantern/Lantern_01_1k.gltf' ).then( ( g ) => ( ASSETS.lantern = g.scene ) ) );
+	if ( lantern ) jobs.push( new GLTFLoader().loadAsync( BASE + 'models/lantern/Lantern_01_1k.gltf' ).then( ( g ) => ( ASSETS.lantern = g.scene ) ) );
 	await Promise.all( jobs.map( ( j ) => j.catch( ( e ) => console.warn( '[etherwake] asset failed to load', e ) ) ) );
 
 }

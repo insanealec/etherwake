@@ -222,7 +222,6 @@ const TAU = Math.PI * 2;
 const HALF = 2500;
 const SEGMENTS = 512;
 const CENTER = 0.06;
-const SNAP = HALF * CENTER * 2 / SEGMENTS;
 
 // Linear-space colours (they brighten and desaturate after sRGB output, so keep them saturated).
 export const PALETTE = {
@@ -353,7 +352,13 @@ export function etheriumWaves( p, waves, time, height, fadeFrom ) {
 // JS side: heightAt / normalAt for physics. TSL side: etheriumWaves for rendering.
 export class Etherium {
 
-	constructor( scene ) {
+	// segments: the camera-following grid's resolution (quality levels lower it)
+	// simple: the cheap look for low quality (opaque, no deep layer, no per-pixel lump normals)
+	constructor( scene, { segments = SEGMENTS, simple = false } = {} ) {
+
+		this.segments = segments;
+		this.simple = simple;
+		this.snap = HALF * CENTER * 2 / segments; // the finest lattice the vertices snap to
 
 		this.scene = scene;
 		this.time = 0;
@@ -384,9 +389,13 @@ export class Etherium {
 		scene.add( this.mesh );
 
 		// the deeper cloud layer, seen through the top one (a child, so it follows the grid)
-		this.deep = new THREE.Mesh( this.buildGeometry( 256 ), this.buildDeepMaterial() );
-		this.deep.frustumCulled = false;
-		this.mesh.add( this.deep );
+		if ( ! simple ) {
+
+			this.deep = new THREE.Mesh( this.buildGeometry( 256 ), this.buildDeepMaterial() );
+			this.deep.frustumCulled = false;
+			this.mesh.add( this.deep );
+
+		}
 
 	}
 
@@ -408,7 +417,9 @@ export class Etherium {
 	}
 
 	// segments: grid resolution (the gas shells use a coarser grid)
-	buildGeometry( segments = SEGMENTS ) {
+	buildGeometry( segments = this.segments ) {
+
+		const SNAP = this.snap;
 
 		const geo = new THREE.PlaneGeometry( 2, 2, segments, segments );
 		geo.rotateX( - Math.PI / 2 );
@@ -440,7 +451,7 @@ export class Etherium {
 
 	buildMaterial() {
 
-		const mat = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, transparent: true, depthWrite: true } );
+		const mat = new THREE.MeshBasicNodeMaterial( { side: THREE.DoubleSide, transparent: ! this.simple, depthWrite: true } );
 		const vNormal = varyingProperty( 'vec3', 'vEwNormal' );
 		const vWorld = varyingProperty( 'vec3', 'vEwWorld' );
 		const vCrest = varyingProperty( 'float', 'vEwCrest' );
@@ -492,12 +503,23 @@ export class Etherium {
 
 			// cloud tops: per-pixel billow bumps on top of the swell (finite-difference slope of both octaves)
 			const fine = smoothstep( 160.0, 40.0, dist ); // the small lumps fade out with distance
-			const e = 0.3;
-			const b0 = billow( P.xz, t, fine );
-			const bx = billow( P.xz.add( vec2( e, 0 ) ), t, fine ).h;
-			const bz = billow( P.xz.add( vec2( 0, e ) ), t, fine ).h;
-			const bump = smoothstep( 300.0, 40.0, dist ).mul( 2.0 );
-			const nb = normalize( n.add( vec3( bx.sub( b0.h ).div( e ).negate(), 0, bz.sub( b0.h ).div( e ).negate() ).mul( bump ) ) );
+			let b0, nb;
+			if ( this.simple ) {
+
+				// low quality: one lump lookup for the crease shading, the swell's own normal
+				b0 = { occ: mix( float( 0.3 ), float( 1 ), lumps( P.xz.sub( vec2( ...CLOUD.drift ).mul( t ) ).div( CLOUD.big.cell ), t, 0 ).sqrt() ) };
+				nb = n;
+
+			} else {
+
+				const e = 0.3;
+				b0 = billow( P.xz, t, fine );
+				const bx = billow( P.xz.add( vec2( e, 0 ) ), t, fine ).h;
+				const bz = billow( P.xz.add( vec2( 0, e ) ), t, fine ).h;
+				const bump = smoothstep( 300.0, 40.0, dist ).mul( 2.0 );
+				nb = normalize( n.add( vec3( bx.sub( b0.h ).div( e ).negate(), 0, bz.sub( b0.h ).div( e ).negate() ).mul( bump ) ) );
+
+			}
 			const N = select( frontFacing, nb, nb.negate() );
 
 			const crest = smoothstep( - 0.3, 0.75, vCrest );
@@ -523,7 +545,7 @@ export class Etherium {
 		} )();
 
 		// see-through gas: thin in the creases near you, dense on the lump tops and further out
-		mat.opacityNode = Fn( () => {
+		if ( ! this.simple ) mat.opacityNode = Fn( () => {
 
 			const P = vWorld;
 			const dist = length( cameraPosition.sub( P ) );
@@ -546,7 +568,7 @@ export class Etherium {
 		m.transparent = false;
 		m.opacityNode = null;
 		m.needsUpdate = true;
-		this.deep.visible = false;
+		if ( this.deep ) this.deep.visible = false;
 
 	}
 
@@ -688,6 +710,7 @@ export class Etherium {
 		this.time = time;
 		this.uTime.value = time;
 
+		const SNAP = this.snap;
 		this.mesh.position.x = Math.round( camera.position.x / SNAP ) * SNAP;
 		this.mesh.position.z = Math.round( camera.position.z / SNAP ) * SNAP;
 		this.uOffset.value.set( this.mesh.position.x, this.mesh.position.z );

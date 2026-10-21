@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, pass, mrt, output, velocity, rtt, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
+import { Fn, uniform, pass, mrt, output, velocity, rtt, cubeTexture, positionWorldDirection, vec2, vec4, float, length, mix, smoothstep, screenUV, screenSize } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { Starfield } from './sky/Starfield.js';
@@ -17,6 +17,7 @@ import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Title, TITLE } from './ui/Title.js';
 import { AutoExposure } from './post/Exposure.js';
 import { loadAssets } from './world/Assets.js';
+import { pickQuality, DynamicResolution } from './core/Quality.js';
 import { SeaHeight } from './sea/SeaHeight.js';
 import { Volume, VOLUME } from './sea/Volume.js';
 import { Surfer } from './player/Surfer.js';
@@ -76,9 +77,15 @@ export class App {
 
 		} );
 
-		// temporal AA (TRAA, in buildPipeline) replaces MSAA; ?noTAA brings MSAA back
-		this.renderer = new THREE.WebGPURenderer( { antialias: this.params.has( 'noTAA' ) } );
-		this.renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
+		// graphics quality (core/Quality.js): a level's feature is on unless its ?noX flag is given
+		this.quality = pickQuality( this.params );
+		this.has = ( feature, flag ) => !! this.quality[ feature ] && ! this.params.has( flag );
+		this.dynres = new DynamicResolution( this.quality );
+		console.info( `[etherwake] quality: ${ this.quality.name }${ this.quality.chosen === 'auto' ? ' (auto)' : '' }` );
+		// temporal AA (TRAA, in buildPipeline) replaces MSAA; without it, MSAA
+		// ?gpuTime: GPU timestamp queries (where supported), shown in the ?stats line as GPU ms per frame
+		this.renderer = new THREE.WebGPURenderer( { antialias: ! this.has( 'taa', 'noTAA' ), trackTimestamp: this.params.has( 'gpuTime' ) } );
+		this.renderer.setPixelRatio( this.pixelRatio() );
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
 		this.sizeBeauty();
 		// ACES keeps the nebula colours vivid (AgX washed them grey); ?noCinematic turns off the
@@ -106,7 +113,7 @@ export class App {
 		await this.renderer.init();
 		this.backend = this.renderer.backend.isWebGPUBackend ? 'webgpu' : 'webgl2';
 		console.info( `[etherwake] renderer backend: ${ this.backend }` );
-		await loadAssets(); // CC0 textures and models (world/Assets.js), before the world is built
+		await loadAssets( { lantern: this.quality.lanterns } ); // CC0 textures and models (world/Assets.js), before the world is built
 		const gpu = this.renderer.backend.device?.adapterInfo || this.renderer.backend.adapter?.info;
 		if ( gpu ) console.info( `[etherwake] GPU: ${ gpu.vendor } ${ gpu.architecture } ${ gpu.description || '' }` );
 		// ?stats: frame rate, the slowest frame of the last second, the GPU and the canvas size
@@ -119,16 +126,17 @@ export class App {
 
 		}
 
-		this.sea = new Etherium( this.scene );
+		this.sea = new Etherium( this.scene, { segments: this.quality.seaSegments, simple: this.quality.simpleSea } );
 		this.starfield = new Starfield( this.scene, { horizon: this.sea.uFogColor, underwater: this.sea.uUnderwater, sun: this.sea.uSunDir } );
 		this.giant = new GasGiant( this.scene, this.sea.uSunDir );
 		this.moon = new Moon( this.scene, this.sea.uSunDir );
-		if ( ! this.params.has( 'noPuffs' ) ) this.puffs = new Puffs( this.scene, this.sea );
+		if ( this.has( 'puffs', 'noPuffs' ) ) this.puffs = new Puffs( this.scene, this.sea );
 		if ( this.params.has( 'shells' ) ) this.shells = new Shells( this.scene, this.sea );
-		this.motes = this.params.has( 'noMotes' ) ? [] : Object.values( MOTE_LAYERS ).map( ( layer ) => new Motes( this.scene, this.sea, layer ) );
+		this.motes = this.params.has( 'noMotes' ) ? [] : this.quality.motes.map( ( k ) => new Motes( this.scene, this.sea, MOTE_LAYERS[ k ] ) );
 		this.tweaks = new TweakPanel( this );
 		this.buildPipeline();
-		if ( ! this.params.has( 'noReflections' ) ) this.buildEnvironment();
+		if ( this.has( 'reflections', 'noReflections' ) ) this.buildEnvironment();
+		if ( this.quality.skyCube && ! this.params.has( 'noSkyCube' ) ) this.buildSkyCube( this.quality.skyCube );
 		this.buildLights();
 
 		this.port = new Port( this.scene );
@@ -199,7 +207,7 @@ export class App {
 		this.atDropoff = ( p ) => Math.hypot( p.x - dockmaster.buoy.position.x, p.z - dockmaster.buoy.position.z ) < 7;
 		this.save.onChange( ( d ) => this.showCredits( d.credits ) );
 		this.setMode( this.params.has( 'fly' ) ? 'fly' : 'surf' );
-		if ( ! this.params.has( 'noTitle' ) && ! this.params.has( 'fly' ) ) this.title = new Title( this.save.data, () => this.chase.snap( this.surfer ) );
+		if ( ! this.params.has( 'noTitle' ) && ! this.params.has( 'fly' ) ) this.title = new Title( this.save.data, () => this.chase.snap( this.surfer ), this.quality );
 
 		this.renderer.setAnimationLoop( ( t ) => this.frame( t ) );
 
@@ -225,7 +233,7 @@ export class App {
 		let scene = scenePass.getTextureNode( 'output' );
 		// temporal AA: the camera jitters a sub-pixel each frame and TRAA blends the history, reprojected
 		// by per-pixel velocity (graphics pass 3, slice 1)
-		if ( ! this.params.has( 'noTAA' ) ) {
+		if ( this.has( 'taa', 'noTAA' ) ) {
 
 			scenePass.setMRT( mrt( { output, velocity } ) );
 			this.traa = traa( scene, scenePass.getTextureNode( 'depth' ), scenePass.getTextureNode( 'velocity' ), this.camera );
@@ -236,10 +244,10 @@ export class App {
 		// (Before it, the cloud pixels had no motion vectors, the near sea mesh being cut away there, so
 		// TRAA reprojected them as if static: on a fast turn the clouds lagged a frame and snapped back.)
 		// ?noVolume keeps the mesh-only sea (graphics pass 3, slice 2)
-		if ( ! this.params.has( 'noVolume' ) ) {
+		if ( this.has( 'volume', 'noVolume' ) ) {
 
 			this.seaHeight = new SeaHeight( this.sea );
-			this.volume = new Volume( this.sea, this.seaHeight, scenePass.getTextureNode( 'depth' ), this.camera );
+			this.volume = new Volume( this.sea, this.seaHeight, scenePass.getTextureNode( 'depth' ), this.camera, this.quality.volumeRes );
 			this.sea.useVolume( VOLUME.range );
 			this.cameraClearance = VOLUME.cameraClear; // look down onto the cloud tops, not through them
 			if ( this.puffs ) this.puffs.mesh.visible = false;
@@ -265,8 +273,8 @@ export class App {
 		const horizon = mix( float( 1 ), smoothstep( lens.w.mul( 0.97 ), lens.w.mul( 1.03 ), lens.z ), uLens.w );
 		this.flare = new SunFlare( this.sea.uSunDir );
 		let out = color.add( this.flare.node );
-		if ( ! this.params.has( 'noAutoExposure' ) ) this.exposure = new AutoExposure( scene );
-		if ( ! this.params.has( 'noBloom' ) ) {
+		if ( this.has( 'autoExposure', 'noAutoExposure' ) ) this.exposure = new AutoExposure( scene );
+		if ( this.has( 'bloom', 'noBloom' ) ) {
 
 			this.bloom = bloom( color, 0.55, 0.45, 0.85 );
 			out = out.add( this.bloom );
@@ -274,7 +282,7 @@ export class App {
 		}
 		if ( this.cinematic ) {
 
-			out = out.add( godRays( scene, this.flare.uSun, this.flare.uVis ) );
+			if ( this.has( 'godRays', 'noGodRays' ) ) out = out.add( godRays( scene, this.flare.uSun, this.flare.uVis ) );
 			out = out.add( speedLines( this.uSpeedFx, this.sea.uTime ) );
 			this.pipeline.outputNode = grade( out.rgb.mul( horizon ), this.sea.uTime );
 
@@ -342,7 +350,15 @@ export class App {
 
 		if ( this.stats ) this.updateStats();
 		this.clock.update( time );
-		const dt = Math.max( 0, Math.min( this.clock.getDelta(), 0.1 ) );
+		const rawDt = this.clock.getDelta();
+		const dt = Math.max( 0, Math.min( rawDt, 0.1 ) );
+		// dynamic resolution: render fewer pixels while frames run slow
+		if ( this.dynres.update( rawDt ) ) {
+
+			this.renderer.setPixelRatio( this.pixelRatio() );
+			this.sizeBeauty();
+
+		}
 		const input = this.input;
 		if ( this.title?.open ) input.keys.clear(), input.pressed.clear(); // nothing steers while the title is up
 
@@ -466,6 +482,18 @@ export class App {
 		}
 		this.pipeline.render();
 		this.exposure?.measure( this.renderer );
+		if ( this.params.has( 'gpuTime' ) && ! this.gpuPending ) {
+
+			this.gpuPending = true;
+			this.renderer.resolveTimestampsAsync( 'render' ).then( ( ms ) => {
+
+				if ( ms > 0 ) this.gpuMs = ( this.gpuMs ?? ms ) * 0.9 + ms * 0.1;
+				this.gpuPending = false;
+
+			} ).catch( () => ( this.gpuPending = false ) );
+
+		}
+		this.updateSkyCube();
 
 	}
 
@@ -1195,7 +1223,7 @@ export class App {
 		S.last = now;
 		if ( now - S.since < 1000 ) return;
 		const c = this.renderer.domElement;
-		this.statsEl.textContent = `${ Math.round( S.frames * 1000 / ( now - S.since ) ) } fps · worst ${ S.worst.toFixed( 0 ) } ms · ${ c.width }x${ c.height } @${ devicePixelRatio } · ${ S.gpu }`;
+		this.statsEl.textContent = `${ Math.round( S.frames * 1000 / ( now - S.since ) ) } fps · worst ${ S.worst.toFixed( 0 ) } ms · ${ c.width }x${ c.height } @${ devicePixelRatio } · ${ this.quality.name } ×${ this.dynres.scale.toFixed( 2 ) }${ this.gpuMs ? ` · GPU ${ this.gpuMs.toFixed( 1 ) } ms` : '' } · ${ S.gpu }`;
 		S.frames = 0;
 		S.worst = 0;
 		S.since = now;
@@ -1216,6 +1244,49 @@ export class App {
 		THREE.RendererUtils.restoreRendererState( this.renderer, state );
 		this.scene.environment = target.texture;
 		this.scene.environmentIntensity = 0.8;
+
+	}
+
+	// Lower quality levels draw the sky from a cube map instead of the procedural shader (dozens of noise
+	// evaluations per sky pixel per frame): rendered once here, and again when the region tint or the
+	// underwater state changes (updateSkyCube)
+	buildSkyCube( size ) {
+
+		this.skyScene = new THREE.Scene();
+		this.skyScene.backgroundNode = this.scene.backgroundNode;
+		this.skyTarget = new THREE.CubeRenderTarget( size, { type: THREE.HalfFloatType } );
+		this.skyCam = new THREE.CubeCamera( 1, 100, this.skyTarget );
+		this.renderSkyCube();
+		this.scene.backgroundNode = cubeTexture( this.skyTarget.texture, positionWorldDirection );
+
+	}
+
+	renderSkyCube() {
+
+		this.skyState = THREE.RendererUtils.resetRendererState( this.renderer, this.skyState );
+		this.skyCam.update( this.renderer, this.skyScene );
+		THREE.RendererUtils.restoreRendererState( this.renderer, this.skyState );
+		this.skyKey = this.skyKeyNow();
+		this.skyAt = this.time;
+
+	}
+
+	skyKeyNow() {
+
+		return `${ Math.round( this.sea.regionMix * 8 ) }|${ this.sea.underwater }`;
+
+	}
+
+	updateSkyCube() {
+
+		if ( this.skyTarget && this.time - this.skyAt > 1 && this.skyKeyNow() !== this.skyKey ) this.renderSkyCube();
+
+	}
+
+	// device pixels per CSS pixel: capped by the quality level, lowered by dynamic resolution
+	pixelRatio() {
+
+		return Math.min( window.devicePixelRatio, this.quality.pixelRatio ) * this.dynres.scale;
 
 	}
 

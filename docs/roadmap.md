@@ -468,6 +468,20 @@
   readout shows the last 6 tricks. Not yet: whale-spine / ice-ridge rails, grind variations,
   sparks.
 
+- **Mobile, slice 1: quality levels (2026-10-21).** User played on a Galaxy S20 Ultra (Android Chrome,
+  WebGPU): abysmally slow (it rendered ~3.7M px a frame at pixelRatio 2 with the full desktop pipeline).
+  `core/Quality.js`: `QUALITY` high / medium / low (pixel ratio cap 2 / 1.5 / 1; TAA, volume and its
+  resolution, puffs, bloom, god rays, auto exposure, reflections, mote layers, sea grid 512 / 384 / 256,
+  lantern models, `simpleSea`, `skyCube`), auto-picked (phones/tablets low, desktop high), forced by
+  `?quality=` or the title screen's Graphics setting (localStorage `etherwake.quality`, reloads), `?noX`
+  flags still apply on top (`App.has()`). `DynamicResolution`: render scale steps down 15% while frames
+  average over ~21 ms (to minScale), back up 10% after 3 s of headroom. Low: the opaque simple sea (one
+  lump lookup, the swell's normal, no deep layer: `Etherium({ simple })`), and the sky drawn from a cube
+  map (`App.buildSkyCube`, re-rendered when the region tint or underwater state changes) instead of the
+  procedural shader per pixel. Etherium's grid resolution and snap are per instance now. `?gpuTime`
+  (timestamp queries) is wired into `?stats` but only covers some passes: not reliable yet. Next: touch
+  controls, then check on the phone with `?stats`.
+
 ## Next up
 **Tricks, THPS on the astral sea** (user, 2026-10-17: "deeper tricks, like Tony Hawk's Pro Skater").
 1. ✅ Trick combos (below).

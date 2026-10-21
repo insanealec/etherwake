@@ -65,7 +65,7 @@ export class Volume {
 	// sea: Etherium; seaHeight: SeaHeight; depthNode: the scene pass's depth texture node; camera: the
 	// game camera (inside this full-screen pass three's camera nodes mean the quad's camera, so the game
 	// camera's matrices are bound explicitly; they're read at render time, jitter included)
-	constructor( sea, seaHeight, depthNode, camera ) {
+	constructor( sea, seaHeight, depthNode, camera, resolution = VOLUME.resolution ) {
 
 		const V = VOLUME;
 		const cameraPosition = uniform( camera.position );
@@ -308,7 +308,7 @@ export class Volume {
 
 		} );
 
-		this.node = rtt( march(), null, null, { resolutionScale: V.resolution } );
+		this.node = rtt( march(), null, null, { resolutionScale: resolution } );
 
 	}
 
