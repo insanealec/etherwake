@@ -57,7 +57,17 @@ export class Dialogue {
 
 		const last = this.index === this.lines.length - 1;
 		this.textEl.textContent = this.lines[ this.index ] + ( last ? '' : '  ▸' );
-		this.choicesEl.textContent = last && this.choices ? this.choices.map( ( c ) => c.label ).join( this.choices.length > 2 ? '\n' : '     ' ) : '';
+		// each choice its own element (tappable on touch screens: ui/Touch.js)
+		this.choicesEl.replaceChildren();
+		if ( last && this.choices ) this.choices.forEach( ( c, i ) => {
+
+			if ( i ) this.choicesEl.append( this.choices.length > 2 ? '\n' : '     ' );
+			const span = document.createElement( 'span' );
+			span.dataset.key = c.key;
+			span.textContent = c.label;
+			this.choicesEl.append( span );
+
+		} );
 
 	}
 

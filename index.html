@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 	<title>Etherwake</title>
 	<style>
 		html, body { margin: 0; height: 100%; background: #05030d; overflow: hidden; color: #f3e6c4; font: 14px/1.4 Georgia, serif; }
@@ -44,6 +44,22 @@
 		#balance.on { opacity: 1; }
 		#balance i { position: absolute; top: -4px; left: 50%; width: 4px; height: 18px; margin-left: -2px; background: #ffd08a; box-shadow: 0 0 6px #ff7a3a; }
 		#toast { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 30px; letter-spacing: .04em; color: #ffd08a; text-shadow: 0 0 12px #ff7a3a, 0 2px 3px #000; opacity: 0; transition: opacity .35s; pointer-events: none; }
+		body.touch { touch-action: none; -webkit-user-select: none; user-select: none; }
+		body.touch #hud { display: none; }
+		body.touch #dialogue.open { pointer-events: auto; }
+		body.touch #dialogue .choices span { display: inline-block; padding: 6px 10px; margin: 2px 0; border: 1px solid rgba( 255, 207, 138, .35 ); border-radius: 4px; }
+		#touch { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+		body.on-title #touch { display: none; }
+		#touch .stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid rgba( 255, 208, 138, .35 ); background: rgba( 20, 10, 30, .25 ); opacity: 0; transition: opacity .15s; }
+		#touch .stick.on { opacity: 1; }
+		#touch .stick i { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba( 255, 208, 138, .45 ); box-shadow: 0 0 10px #ff7a3a; }
+		#touch button { pointer-events: auto; touch-action: none; font: 15px Georgia, serif; color: #ffe2b0; background: rgba( 20, 10, 30, .45 ); border: 1px solid rgba( 255, 208, 138, .45 ); border-radius: 50%; text-shadow: 0 1px 2px #000; }
+		#touch button.on { background: rgba( 255, 150, 70, .45 ); }
+		#touch .buttons { position: absolute; right: max( 16px, env( safe-area-inset-right ) ); bottom: 16px; display: grid; grid-template-columns: repeat( 3, 64px ); grid-auto-rows: 64px; gap: 10px; direction: rtl; }
+		#touch .buttons button { width: 64px; height: 64px; }
+		#touch .buttons button.big { grid-row: span 2; height: 138px; border-radius: 32px; }
+		#touch .small { position: absolute; right: max( 16px, env( safe-area-inset-right ) ); top: 54px; display: flex; gap: 8px; }
+		#touch .small button { width: 52px; height: 32px; border-radius: 6px; font-size: 13px; }
 		#title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 16px; background: radial-gradient( ellipse at 50% 45%, rgba( 10, 4, 24, .15 ), rgba( 5, 3, 13, .7 ) ); cursor: pointer; transition: opacity .9s; z-index: 10; }
 		#title.closing { opacity: 0; pointer-events: none; }
 		#title .name { font-size: clamp( 52px, 11vw, 120px ); letter-spacing: .08em; color: #ffd08a; text-shadow: 0 0 24px #ff7a3a, 0 0 60px rgba( 255, 120, 60, .5 ), 0 3px 4px #000; animation: breathe 6s ease-in-out infinite; }

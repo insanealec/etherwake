@@ -481,6 +481,13 @@
   procedural shader per pixel. Etherium's grid resolution and snap are per instance now. `?gpuTime`
   (timestamp queries) is wired into `?stats` but only covers some passes: not reliable yet. Next: touch
   controls, then check on the phone with `?stats`.
+- **Mobile, slice 2: touch controls (2026-10-21).** `ui/Touch.js` (phones/tablets, or `?touch`): a
+  floating thumb stick on the left half (W/A/S/D with a 0.3 dead zone: carve and sail, walking, trick
+  direction) and buttons on the right (Jump, Flip, Grab, Grind, Act = Space/J/K/L/E; Map, Ship, Mute =
+  Tab/G/mute callback); they set the same Input key states as the keyboard. Dialogue choices are separate
+  `[data-key]` spans and tappable; tapping the box advances. First touch requests fullscreen + landscape.
+  `body.touch` hides the keyboard hint; viewport no-zoom; `touch-action: none`. Checked with synthetic
+  pointer events in the pane; not yet on a real phone.
 
 ## Next up
 **Tricks, THPS on the astral sea** (user, 2026-10-17: "deeper tricks, like Tony Hawk's Pro Skater").

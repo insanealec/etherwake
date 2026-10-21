@@ -17,7 +17,8 @@ import { ChaseCamera, MOTION } from './core/ChaseCamera.js';
 import { Title, TITLE } from './ui/Title.js';
 import { AutoExposure } from './post/Exposure.js';
 import { loadAssets } from './world/Assets.js';
-import { pickQuality, DynamicResolution } from './core/Quality.js';
+import { pickQuality, DynamicResolution, isMobile } from './core/Quality.js';
+import { Touch } from './ui/Touch.js';
 import { SeaHeight } from './sea/SeaHeight.js';
 import { Volume, VOLUME } from './sea/Volume.js';
 import { Surfer } from './player/Surfer.js';
@@ -147,6 +148,8 @@ export class App {
 		this.chase = new ChaseCamera( this.camera, this.sea, this.cameraClearance ? { clearance: this.cameraClearance } : {} );
 		this.surfer.onLand = ( r ) => this.onLand( r );
 		// tricks chain into combos (game/Tricks.js)
+		// touch controls on phones and tablets (?touch forces them)
+		if ( isMobile() || this.params.has( 'touch' ) ) this.touch = new Touch( this.input, { onMute: () => this.audio.setMuted( ! this.audio.muted ) } );
 		this.combo = new Combo();
 		this.comboEl = document.getElementById( 'combo' );
 		this.surfer.onTrick = ( name, points ) => {
